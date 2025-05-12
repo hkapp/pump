@@ -4,7 +4,7 @@ fn main() {
     match submain() {
         Ok(_) => (),
         Err(e) => {
-            eprintln!("Error! {}", e);
+            eprintln!("pump: {}", e);
             std::process::exit(1); // TODO use the error to get a return code
         }
     }
@@ -33,13 +33,14 @@ fn tokenize(s: &str) -> impl Iterator<Item=Identifier> + '_ {
 }
 
 fn build_exp_tree<I: Iterator<Item=Identifier>>(tokens: I) -> Result<Expr, Error> {
-    let idns: Vec<_> = tokens.collect();
+    let mut idns: Vec<_> = tokens.collect();
 
     match idns.len() {
         1 => {
-            match idns[0].as_str() {
+            let single_idn = idns.pop().unwrap();
+            match single_idn.as_str() {
                 "stdin" => Ok(Expr::Stdin),
-                op@_  => panic!("Unsupported operator: {op}")
+                _       => Err(Error::CantResolve(single_idn)),
             }
         }
         0 => Err(Error::EmptyProgram),
@@ -68,6 +69,7 @@ impl Expr {
 enum Error {
     EmptyProgram,
     TooManyExprs,  // TODO remove
+    CantResolve(Identifier),
 }
 
 impl Display for Error {
@@ -77,6 +79,8 @@ impl Display for Error {
                 write!(f, "Program is empty. Provide at least one expression."),
             Error::TooManyExprs =>
                 write!(f, "Too many expressions (we only support 1 right now)"),
+            Error::CantResolve(idn) =>
+                write!(f, "Can't resolve identifier {:?}", idn),
         }
     }
 }
