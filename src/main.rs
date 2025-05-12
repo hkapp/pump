@@ -12,7 +12,11 @@ fn main() {
 
 fn submain() -> Result<(), Error> {
     let mut args: Vec<String> = env::args().skip(1).collect();
-    assert_eq!(args.len(), 1);
+
+    if args.is_empty() {
+        return Err(Error::EmptyProgram);
+    }
+
     let pgm = args.pop().unwrap();
     eprintln!("Program: {}", pgm);
     let expr_tree = parse(&pgm)?;
