@@ -1,7 +1,11 @@
-use std::{env, fmt::Display, io};
+pub mod error;
+
+use std::{env, io};
 
 use regex::Regex;
 use lazy_static::lazy_static; // FIXME should be using LazyCell here, but couldn't get it working
+
+use error::{Error, ErrCode};
 
 fn main() {
     let pgm = retrieve_program();
@@ -82,12 +86,12 @@ fn build_exp_tree<I: Iterator<Item=Identifier>>(tokens: I) -> Result<Expr, Error
                 "stdin" => Ok(Expr::Stdin),
                 _       => {
                     let idn_pos = single_idn.position;
-                    error(ErrCode::CantResolve(single_idn), idn_pos)
+                    error::error(ErrCode::CantResolve(single_idn), idn_pos)
                 },
             }
         }
-        0 => error_no_pos(ErrCode::EmptyProgram),
-        _ => error(ErrCode::TooManyExprs, idns[1].position),
+        0 => error::error_no_pos(ErrCode::EmptyProgram),
+        _ => error::error(ErrCode::TooManyExprs, idns[1].position),
     }
 }
 
@@ -105,59 +109,6 @@ impl Expr {
                     .lines()
                     .for_each(|l| println!("{}", l.unwrap()))
             }
-        }
-    }
-}
-
-struct Error {
-    position:   ParsePos,
-    error_code: ErrCode
-}
-
-impl Error {
-    fn new(err_code: ErrCode, err_pos: ParsePos) -> Self {
-        Error {
-            position:   err_pos,
-            error_code: err_code
-        }
-    }
-
-    fn format<W: io::Write>(&self, source: &str, buf: &mut W) -> io::Result<()> {
-        self.position.format(source, buf)?;
-        writeln!(buf)?;
-        write!(buf, "pump: {}", self.error_code)
-    }
-}
-
-/// Will always return Err
-fn error<T>(err_code: ErrCode, err_pos: ParsePos) -> Result<T, Error> {
-    Err(Error::new(err_code, err_pos))
-}
-
-/// Will always return Err
-// FIXME introduce the actual concept of "no position"
-fn error_no_pos<T>(err_code: ErrCode) -> Result<T, Error> {
-    Err(Error::new(err_code, ParsePos{ start: 0, len: 1 }))
-}
-
-enum ErrCode {
-    EmptyProgram,
-    TooManyArguments,
-    TooManyExprs,  // TODO remove
-    CantResolve(Identifier),
-}
-
-impl Display for ErrCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ErrCode::EmptyProgram =>
-                write!(f, "Program is empty. Provide at least one expression."),
-            ErrCode::TooManyArguments =>
-                write!(f, "Too many command line arguments"),
-            ErrCode::TooManyExprs =>
-                write!(f, "Too many expressions (we only support 1 right now)"),
-            ErrCode::CantResolve(idn) =>
-                write!(f, "Can't resolve identifier {:?}", idn.name),
         }
     }
 }
