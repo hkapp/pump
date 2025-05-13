@@ -55,7 +55,10 @@ impl<'h> From<regex::Match<'h>> for Identifier {
     fn from(m: regex::Match) -> Self {
         Identifier {
             name:     m.as_str().into(),
-            position: ParsePos(m.start()),
+            position: ParsePos {
+                start: m.start(),
+                len:   m.as_str().len()
+            },
         }
     }
 }
@@ -134,7 +137,7 @@ fn error<T>(err_code: ErrCode, err_pos: ParsePos) -> Result<T, Error> {
 /// Will always return Err
 // FIXME introduce the actual concept of "no position"
 fn error_no_pos<T>(err_code: ErrCode) -> Result<T, Error> {
-    Err(Error::new(err_code, ParsePos(0)))
+    Err(Error::new(err_code, ParsePos{ start: 0, len: 1 }))
 }
 
 enum ErrCode {
@@ -160,12 +163,15 @@ impl Display for ErrCode {
 }
 
 #[derive(Clone, Copy)]
-struct ParsePos(usize);
+struct ParsePos {
+    start: usize,
+    len:   usize
+}
 
 impl ParsePos {
     fn format<W: io::Write>(&self, source: &str, buf: &mut W) -> io::Result<()> {
         // TODO support multi-line programs
         writeln!(buf, "{}", source)?;
-        write!(buf, "{}^", str::repeat(" ", self.0))
+        write!(buf, "{}{}", str::repeat(" ", self.start), str::repeat("^", self.len))
     }
 }
