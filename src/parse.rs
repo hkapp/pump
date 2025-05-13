@@ -1,37 +1,13 @@
+mod token;
+
+pub use token::{ParsePos, Identifier};
+
 use std::io;
-use regex::Regex;
-use lazy_static::lazy_static; // FIXME should be using LazyCell here, but couldn't get it working
 
 use crate::error::{self, Error, ErrCode};
 
 pub fn parse(pgm: &str) -> Result<Expr, Error> {
-    build_exp_tree(tokenize(pgm))
-}
-
-pub struct Identifier {
-    pub name: String,
-    position: ParsePos
-}
-
-impl<'h> From<regex::Match<'h>> for Identifier {
-    fn from(m: regex::Match) -> Self {
-        Identifier {
-            name:     m.as_str().into(),
-            position: ParsePos {
-                start: m.start(),
-                len:   m.as_str().len()
-            },
-        }
-    }
-}
-
-lazy_static! {
-    static ref IDN_REGEX: Regex = Regex::new("[a-zA-Z][0-9a-zA-Z]*").unwrap();
-}
-
-fn tokenize(s: &str) -> impl Iterator<Item=Identifier> + '_ {
-    IDN_REGEX.find_iter(s)
-        .map(Into::into)
+    build_exp_tree(token::tokenize(pgm))
 }
 
 fn build_exp_tree<I: Iterator<Item=Identifier>>(tokens: I) -> Result<Expr, Error> {
@@ -68,19 +44,5 @@ impl Expr {
                     .for_each(|l| println!("{}", l.unwrap()))
             }
         }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct ParsePos {
-    pub start: usize,
-    pub len:   usize
-}
-
-impl ParsePos {
-    pub fn format<W: io::Write>(&self, source: &str, buf: &mut W) -> io::Result<()> {
-        // TODO support multi-line programs
-        writeln!(buf, "{}", source)?;
-        write!(buf, "{}{}", str::repeat(" ", self.start), str::repeat("^", self.len))
     }
 }
