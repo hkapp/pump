@@ -9,6 +9,7 @@ pub struct Identifier {
 
 impl Identifier {
     fn token(m: &regex::Match) -> Token {
+        println!("Identifier: {}", m.as_str());
         let pos = ParsePos::from(m);
         let idn =
             Identifier {
@@ -23,14 +24,14 @@ pub fn tokenize<'a>(s: &'a str) -> Tokenizer<'a> {
     Tokenizer {
         source:   s,
         curr_pos: 0,
-        regexes:  TOKEN_RXS.iter().map(TokenRx::from).collect(),
+        token_rxs:  TOKEN_RXS.iter().map(TokenRx::from).collect(),
     }
 }
 
 pub struct Tokenizer<'a> {
     source:   &'a str,
     curr_pos: usize,
-    regexes:  Vec<TokenRx>,
+    token_rxs:  Vec<TokenRx>,
 }
 
 pub struct Token {
@@ -60,7 +61,12 @@ impl<'a> Iterator for Tokenizer<'a> {
             return None;
         }
 
-        match self.regexes[0].try_at(self.source, self.curr_pos) {
+        let first_success =
+            self.token_rxs
+                .iter()
+                .find_map(|trx| trx.try_at(self.source, self.curr_pos));
+
+        match first_success {
             Some(token) => {
                 self.curr_pos += token.len();
                 Some(token)
@@ -87,7 +93,8 @@ impl<'a> Tokenizer<'a> {
 
         if len_diff == 0 {
             // Considering how the tokenizer works, this can never happen before the end of the source program
-            assert!(self.at_end() || self.curr_pos == 0);
+            assert!(self.at_end() || self.curr_pos == 0,
+                "No trimmed spaces at position {}, i.e. {:?}", self.curr_pos, &self.source[self.curr_pos..]);
         }
         else {
             self.curr_pos += len_diff;
@@ -96,6 +103,7 @@ impl<'a> Tokenizer<'a> {
 }
 
 // Note: this definition forbids using the From trait implementation
+// TODO we can turn this into a function that returns a Kind
 type BuildFn = fn(&regex::Match) -> Token;
 
 struct TokenRx {
@@ -114,15 +122,29 @@ impl From<&TRDef> for TokenRx {
     }
 }
 
-const TOKEN_RXS: [TRDef; 1] = [
+fn regex_match(m: &regex::Match) -> Token {
+    println!("regex_match: {}", m.as_str());
+    // FIXME we need to get a regex::Captures instead as argument
+    let regex_substr = &m.as_str()[2..(m.len()-1)];
+    // FIXME need to return a proper error here
+    let re_match = Regex::new(regex_substr).unwrap();
+
+    let pos = ParsePos::from(m);
+    Token { position: pos, kind: Kind::RegexMatch(re_match) }
+}
+
+const TOKEN_RXS: [TRDef; 2] = [
     // WARNING the ordering matters here
-    ("[a-zA-Z][0-9a-zA-Z]*", Identifier::token)
+    // ("m/(?:[^/]|\\/)*/\\>", regex_match),
+    ("m/(?:[^/]|\\/)*/", regex_match),
+    ("[a-zA-Z][0-9a-zA-Z]*", Identifier::token),
 ];
 
 impl TokenRx {
     fn try_at(&self, source: &str, start: usize) -> Option<Token> {
         self.regex
             .find_at(source, start)
+            .filter(|m| m.start() == start)
             .map(|m| (self.build_fn)(&m))
     }
 }
