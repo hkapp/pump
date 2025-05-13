@@ -8,18 +8,14 @@ pub struct Identifier {
 }
 
 impl Identifier {
-    fn from(m: &regex::Match) -> Self {
-        Identifier {
-            name:     m.as_str().into(),
-            position: ParsePos {
-                start: m.start(),
-                len:   m.as_str().len()
-            },
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.position.len
+    fn token(m: &regex::Match) -> Token {
+        let pos = ParsePos::from(m);
+        let idn =
+            Identifier {
+                name:     m.as_str().into(),
+                position: pos,
+            };
+        Token { position: pos, kind: Kind::Identifier(idn) }
     }
 }
 
@@ -37,7 +33,21 @@ pub struct Tokenizer<'a> {
     regexes:  Vec<TokenRx>,
 }
 
-type Token = Identifier;
+pub struct Token {
+    pub position: ParsePos,
+    pub kind:     Kind,
+}
+
+pub enum Kind {
+    Identifier(Identifier),
+    RegexMatch(Regex),
+}
+
+impl Token {
+    fn len(&self) -> usize {
+        self.position.len
+    }
+}
 
 impl<'a> Iterator for Tokenizer<'a> {
     type Item = Token;
@@ -106,7 +116,7 @@ impl From<&TRDef> for TokenRx {
 
 const TOKEN_RXS: [TRDef; 1] = [
     // WARNING the ordering matters here
-    ("[a-zA-Z][0-9a-zA-Z]*", Identifier::from)
+    ("[a-zA-Z][0-9a-zA-Z]*", Identifier::token)
 ];
 
 impl TokenRx {
@@ -129,5 +139,12 @@ impl ParsePos {
         // TODO support multi-line programs
         writeln!(buf, "{}", source)?;
         write!(buf, "{}{}", str::repeat(" ", self.start), str::repeat("^", self.len))
+    }
+
+    fn from(m: &regex::Match) -> Self {
+        ParsePos {
+            start: m.start(),
+            len:   m.as_str().len()
+        }
     }
 }
