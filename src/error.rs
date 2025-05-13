@@ -1,6 +1,6 @@
 use std::{fmt::Display, io};
 
-use super::{ParsePos, Identifier};
+use crate::parse::{ParsePos, Identifier};
 
 pub struct Error {
     position:   ParsePos,
