@@ -1,4 +1,5 @@
 use std::io;
+use std::fmt::Debug;
 
 use regex::Regex;
 
@@ -47,6 +48,21 @@ pub enum Kind {
 impl Token {
     fn len(&self) -> usize {
         self.position.len
+    }
+}
+
+impl Debug for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}@{}+{}", self.kind, self.position.start, self.position.len)
+    }
+}
+
+impl Debug for Kind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Kind::Identifier(idn) => write!(f, "Identifier({:?})", idn.name),
+            Kind::RegexMatch(re) => write!(f, "RegexMatch({:?})", re.as_str()),
+        }
     }
 }
 

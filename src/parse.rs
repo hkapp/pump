@@ -12,6 +12,7 @@ pub fn parse(pgm: &str) -> Result<Expr, Error> {
 
 fn build_exp_tree<I: Iterator<Item=Token>>(token_stream: I) -> Result<Expr, Error> {
     let mut tokens: Vec<_> = token_stream.collect();
+    eprintln!("Tokens: {:?}", tokens);
 
     match tokens.len() {
         1 => {
