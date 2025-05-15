@@ -1,5 +1,6 @@
 pub mod error;
 pub mod parse;
+pub mod runtime;
 
 use std::env;
 
@@ -40,6 +41,5 @@ fn submain(pgm: &str) -> Result<(), Error> {
     eprintln!("Program: {}", pgm);
     let expr_tree = parse::parse(&pgm)?;
     eprintln!("Parsed program: {:?}", expr_tree);
-    expr_tree.exec();
-    Ok(())
+    runtime::exec_and_print(expr_tree)
 }

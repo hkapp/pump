@@ -2,7 +2,7 @@ mod token;
 
 pub use token::{ParsePos, Identifier, Token};
 
-use std::{io, iter::Peekable};
+use std::iter::Peekable;
 
 use crate::error::{self, Error, ErrCode};
 
@@ -29,20 +29,6 @@ fn build_exp_tree<I: Iterator<Item=Token>>(token_stream: I) -> Result<Expr, Erro
         },
         None => error::error_no_pos(ErrCode::EmptyProgram),
     }
-    /*match tokens.len() {
-        1 => {
-            let single_token = tokens.pop().unwrap();
-            use token::Kind;
-            match single_token.kind {
-                Kind::Identifier(single_idn) => {
-
-                },
-                _ => panic!("Unsupported token"),
-            }
-        }
-        0 => error::error_no_pos(ErrCode::EmptyProgram),
-        _ => error::error(ErrCode::TooManyExprs, tokens[1].position),
-    }*/
 }
 
 fn build_starting<I: Iterator<Item=Token>>(starting_token: Token, rem_tokens: &mut Peekable<I>) -> Result<Expr, Error> {
@@ -102,18 +88,4 @@ pub enum Expr {
     Stdin,
     RegexMatch(regex::Regex, ParsePos),
     Filter { filter_fn: Box<Expr>, data_source: Box<Expr> }
-}
-
-impl Expr {
-    pub fn exec(&self) {
-        match self {
-            Expr::Stdin => {
-                // Here we simply read everything from stdin and pipe it out
-                io::stdin()
-                    .lines()
-                    .for_each(|l| println!("{}", l.unwrap()))
-            }
-            _ => panic!("Unsupported operator: {:?}", self),
-        }
-    }
 }
