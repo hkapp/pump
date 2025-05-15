@@ -1,10 +1,12 @@
 use std::io::{self, StdinLock};
 
+use regex::Regex;
+
 use crate::{error::Error, parse::Expr};
 
 enum RtNode {
     Stdin(StdinState),
-    // RegexMatch(regex::Regex, ParsePos),
+    RegexMatch(RegexMatch),
     // Filter { filter_fn: Box<Expr>, data_source: Box<Expr> }
 }
 
@@ -12,12 +14,16 @@ impl Exec for RtNode {
     fn next_value(&mut self) -> Option<Result<RtVal, Error>> {
         match self {
             Self::Stdin(s) => s.next_value(),
+            Self::RegexMatch(r) => r.next_value(),
         }
     }
-}
 
-struct StdinState {
-    stdin_lines: io::Lines<StdinLock<'static>>,
+    fn eval(&mut self, input: RtVal) -> Result<RtVal, Error> {
+        match self {
+            Self::Stdin(s) => s.eval(input),
+            Self::RegexMatch(r) => r.eval(input),
+        }
+    }
 }
 
 type RtVal = String;
@@ -25,15 +31,7 @@ type RtVal = String;
 trait Exec {
     // TODO make this an iterator if meaningful
     fn next_value(&mut self) -> Option<Result<RtVal, Error>>;
-}
-
-impl Exec for StdinState {
-    fn next_value(&mut self) -> Option<Result<RtVal, Error>> {
-        self.stdin_lines
-            .next()
-            // FIXME introduce a proper error here
-            .map(|l| Ok(l.unwrap()))
-    }
+    fn eval(&mut self, input: RtVal) -> Result<RtVal, Error>;
 }
 
 pub fn exec_and_print(expr_tree: Expr) -> Result<(), Error> {
@@ -49,6 +47,48 @@ pub fn exec_and_print(expr_tree: Expr) -> Result<(), Error> {
 fn executable_form(expr: Expr) -> RtNode {
     match expr {
         Expr::Stdin => RtNode::Stdin(StdinState { stdin_lines: io::stdin().lines() }),
-        _ => panic!("Unsupported operator: {:?}", expr),
+        Expr::RegexMatch(regex, pos) => RegexMatch::new_node(regex),
+        _ => todo!(),
+    }
+}
+
+struct StdinState {
+    stdin_lines: io::Lines<StdinLock<'static>>,
+}
+
+impl Exec for StdinState {
+    fn next_value(&mut self) -> Option<Result<RtVal, Error>> {
+        self.stdin_lines
+            .next()
+            // FIXME introduce a proper error here
+            .map(|l| Ok(l.unwrap()))
+    }
+
+    fn eval(&mut self, _input: RtVal) -> Result<RtVal, Error> {
+        panic!("Unsupported operation");
+    }
+}
+
+struct RegexMatch {
+    regex: Regex,
+}
+
+impl RegexMatch {
+    fn new_node(regex: Regex) -> RtNode {
+        let me = RegexMatch { regex };
+        RtNode::RegexMatch(me)
+    }
+}
+
+impl Exec for RegexMatch {
+    fn next_value(&mut self) -> Option<Result<RtVal, Error>> {
+        panic!("Unsupported operation")
+    }
+
+    fn eval(&mut self, input: RtVal) -> Result<RtVal, Error> {
+        // FIXME
+        let is_match = self.regex.is_match(&input);
+        let rt_val = is_match.to_string();
+        Ok(rt_val)
     }
 }
