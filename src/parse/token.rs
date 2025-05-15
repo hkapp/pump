@@ -10,7 +10,6 @@ pub struct Identifier {
 
 impl Identifier {
     fn token(m: &regex::Match) -> Token {
-        println!("Identifier: {}", m.as_str());
         let pos = ParsePos::from(m);
         let idn =
             Identifier {
@@ -165,7 +164,7 @@ impl TokenRx {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ParsePos {
     pub start: usize,
     pub len:   usize
@@ -184,5 +183,9 @@ impl ParsePos {
             start: m.start(),
             len:   m.as_str().len()
         }
+    }
+
+    pub fn right_after(&self) -> ParsePos {
+        ParsePos { start: self.start + self.len, len: 1 }
     }
 }

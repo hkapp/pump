@@ -38,6 +38,7 @@ pub enum ErrCode {
     TooManyArguments,
     TooManyExprs,  // TODO remove
     CantResolve(Identifier),
+    NotEnoughArguments,
 }
 
 impl Display for ErrCode {
@@ -51,6 +52,8 @@ impl Display for ErrCode {
                 write!(f, "Too many expressions (we only support 1 right now)"),
             ErrCode::CantResolve(idn) =>
                 write!(f, "Can't resolve identifier {:?}", idn.name),
+            ErrCode::NotEnoughArguments =>
+                write!(f, "Not enough arguments in function call"),
         }
     }
 }
