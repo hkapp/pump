@@ -124,11 +124,26 @@ impl StreamFilter {
 
 impl Exec for StreamFilter {
     fn next_value(&mut self) -> Option<Result<RtVal, Error>> {
-        self.stream
-            .next_value()
-            .map(|val_res|
-                val_res.and_then(
-                    |val| self.filter_fn.eval(val)))
+        loop {
+            match self.stream.next_value() {
+                None => return None, // End of the stream
+                same@Some(Err(_)) => return same, // Stream encountered an error
+                Some(Ok(rt_val)) => {
+                    // FIXME
+                    let keep = rt_val.clone();
+                    let filter_val = match self.filter_fn.eval(rt_val) {
+                        Ok(v) => v,
+                        Err(e) => return Some(Err(e)),
+                    };
+                    if filter_val == true.to_string() {
+                        return Some(Ok(keep));
+                    }
+                    else {
+                        continue;
+                    }
+                },
+            }
+        }
     }
 
     fn eval(&mut self, _input: RtVal) -> Result<RtVal, Error> {

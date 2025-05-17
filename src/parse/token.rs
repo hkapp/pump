@@ -138,7 +138,6 @@ impl From<&TRDef> for TokenRx {
 }
 
 fn regex_match(m: &regex::Match) -> Token {
-    println!("regex_match: {}", m.as_str());
     // FIXME we need to get a regex::Captures instead as argument
     let regex_substr = &m.as_str()[2..(m.len()-1)];
     // FIXME need to return a proper error here
