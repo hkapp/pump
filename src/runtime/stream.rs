@@ -2,7 +2,7 @@ use std::io::{self, StdinLock};
 
 use crate::{error::Error, parse::Expr};
 
-use super::{scalar::{self, ScalarNode, ExecScalar}, RtVal};
+use super::{scalar::{self, ExecScalar, ScalarNode}, RtVal, StreamVar};
 
 /// Any runtime component that behaves like a stream of runtime values
 // Note: we can't do the other way around and derive a blanket implementation
@@ -70,8 +70,9 @@ impl Iterator for StdinState {
 /* StreamFilter */
 
 struct StreamFilter {
-    filter_fn: Box<ScalarNode>,
-    stream:    Box<StreamNode>,
+    filter_fn:    Box<ScalarNode>,
+    back_channel: StreamVar,
+    stream:       Box<StreamNode>,
 }
 
 impl StreamFilter {
@@ -86,9 +87,12 @@ impl StreamFilter {
             Box::new(b)
         }
 
+        let (back_channel_for_me, back_channel_for_them) = StreamVar::new_pair();
+
         let filter = StreamFilter {
-            filter_fn: box_map(filter_fn, scalar::scalar_from),
-            stream:    box_map(data_source, stream_from),
+            filter_fn:    box_map(filter_fn, scalar::scalar_from),
+            back_channel: back_channel_for_me,
+            stream:       box_map(data_source, stream_from),
         };
 
         StreamNode::Filter(filter)
@@ -110,7 +114,10 @@ impl Iterator for StreamFilter {
                 // We actually got a value from the stream
                 Some(Ok(rt_val)) => {
                     let keep = rt_val.clone();
-                    let predicate_eval = match self.filter_fn.eval(rt_val) {
+
+                    self.back_channel.write(rt_val);
+
+                    let predicate_eval = match self.filter_fn.eval() {
                         Ok(v) => v,
                         Err(e) => return Some(Err(e)),
                     };

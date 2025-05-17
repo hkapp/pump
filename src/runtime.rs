@@ -67,7 +67,29 @@ impl From<String> for RtVal {
 struct StreamVar(Rc<Cell<Option<RtVal>>>);
 
 impl StreamVar {
+    // We don't have the concept of Reader and Writer yet,
+    // but the typical use case will anyway be to have one of each
+    fn new_pair() -> (Self, Self) {
+        let cell = Cell::default();
+        let rc = Rc::new(cell);
+
+        let reader_rc = Rc::clone(&rc);
+        let writer_rc = rc;
+
+        let reader = StreamVar(reader_rc);
+        let writer = StreamVar(writer_rc);
+
+        (reader, writer)
+    }
+
     fn read(&mut self) -> Option<RtVal> {
         self.0.take()
+    }
+
+    fn write(&mut self, new_value: RtVal) {
+        let old_value = self.0.replace(Some(new_value));
+
+        // For now, we require that every written value is read exactly once
+        assert!(old_value.is_none());
     }
 }

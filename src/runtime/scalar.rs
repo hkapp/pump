@@ -6,8 +6,7 @@ use super::{RtVal, StreamVar};
 
 /// Runtime components that return scalar values
 pub trait ExecScalar {
-    // FIXME remove the extra input argument
-    fn eval(&mut self, input: RtVal) -> Result<RtVal, Error>;
+    fn eval(&mut self) -> Result<RtVal, Error>;
 }
 
 pub enum ScalarNode {
@@ -16,10 +15,10 @@ pub enum ScalarNode {
 }
 
 impl ExecScalar for ScalarNode {
-    fn eval(&mut self, input: RtVal) -> Result<RtVal, Error> {
+    fn eval(&mut self) -> Result<RtVal, Error> {
         match self {
-            Self::RegexMatch(r) => r.eval(input),
-            Self::ReadStreamVar(rsv) => rsv.eval(input),
+            Self::RegexMatch(r) => r.eval(),
+            Self::ReadStreamVar(rsv) => rsv.eval(),
         }
     }
 }
@@ -28,7 +27,7 @@ impl ExecScalar for ScalarNode {
 // TODO convert into From impl
 pub fn scalar_from(expr: Expr) -> ScalarNode {
     match expr {
-        Expr::RegexMatch(regex, pos) => RegexMatch::new_node(regex),
+        Expr::RegexMatch(..) => panic!("We don't expect a RegexMatch outside of a FunCall anymore"),
         // It's fine for us to panic here, as typechecking must have guaranteed that
         // we have what our caller expects here
         _ => panic!("Not a scalar: {:?}", expr),
@@ -38,19 +37,22 @@ pub fn scalar_from(expr: Expr) -> ScalarNode {
 /* RegexMatch */
 
 struct RegexMatch {
-    regex: Regex,
+    regex:    Regex,
+    argument: Box<ScalarNode>,
 }
 
 impl RegexMatch {
-    fn new_node(regex: Regex) -> ScalarNode {
-        let me = RegexMatch { regex };
+    fn new_node(regex: Regex, arg: Expr) -> ScalarNode {
+        let rt_arg = scalar_from(arg);
+        let argument = Box::new(rt_arg);
+        let me = RegexMatch { regex , argument };
         ScalarNode::RegexMatch(me)
     }
 }
 
 impl ExecScalar for RegexMatch {
-    fn eval(&mut self, input: RtVal) -> Result<RtVal, Error> {
-        // FIXME
+    fn eval(&mut self) -> Result<RtVal, Error> {
+        let input = self.argument.eval()?;
         let is_match = self.regex.is_match(&input.str_ref().unwrap());
         let rt_val = is_match.into();
         Ok(rt_val)
@@ -63,7 +65,7 @@ struct ReadStreamVar {
 }
 
 impl ExecScalar for ReadStreamVar {
-    fn eval(&mut self, _input: RtVal) -> Result<RtVal, Error> {
+    fn eval(&mut self) -> Result<RtVal, Error> {
         let var_content = self.var.read().unwrap();
         Ok(var_content)
     }
