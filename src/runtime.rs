@@ -7,7 +7,7 @@ use crate::{error::Error, parse::Expr};
 enum RtNode {
     Stdin(StdinState),
     RegexMatch(RegexMatch),
-    // Filter { filter_fn: Box<Expr>, data_source: Box<Expr> }
+    Filter(StreamFilter),
 }
 
 impl Exec for RtNode {
@@ -15,6 +15,7 @@ impl Exec for RtNode {
         match self {
             Self::Stdin(s) => s.next_value(),
             Self::RegexMatch(r) => r.next_value(),
+            Self::Filter(f) => f.next_value(),
         }
     }
 
@@ -22,6 +23,7 @@ impl Exec for RtNode {
         match self {
             Self::Stdin(s) => s.eval(input),
             Self::RegexMatch(r) => r.eval(input),
+            Self::Filter(f) => f.eval(input),
         }
     }
 }
@@ -44,11 +46,12 @@ pub fn exec_and_print(expr_tree: Expr) -> Result<(), Error> {
     Ok(())
 }
 
+// TODO make this take a box
 fn executable_form(expr: Expr) -> RtNode {
     match expr {
         Expr::Stdin => RtNode::Stdin(StdinState { stdin_lines: io::stdin().lines() }),
         Expr::RegexMatch(regex, pos) => RegexMatch::new_node(regex),
-        _ => todo!(),
+        Expr::Filter { filter_fn, data_source } => StreamFilter::new_node(filter_fn, data_source),
     }
 }
 
@@ -90,5 +93,45 @@ impl Exec for RegexMatch {
         let is_match = self.regex.is_match(&input);
         let rt_val = is_match.to_string();
         Ok(rt_val)
+    }
+}
+
+struct StreamFilter {
+    filter_fn: Box<RtNode>,
+    stream:    Box<RtNode>,
+}
+
+impl StreamFilter {
+    fn new_node(filter_fn: Box<Expr>, data_source: Box<Expr>) -> RtNode {
+        // Note: Box::into_inner is only available on nightly
+        fn unbox<T>(boxed: Box<T>) -> T {
+            *boxed
+        }
+
+        fn box_map<T, U, F: FnOnce(T) -> U>(a: Box<T>, f: F) -> Box<U> {
+            let b = f(unbox(a));
+            Box::new(b)
+        }
+
+        let filter = StreamFilter {
+            filter_fn: box_map(filter_fn, executable_form),
+            stream:    box_map(data_source, executable_form),
+        };
+
+        RtNode::Filter(filter)
+    }
+}
+
+impl Exec for StreamFilter {
+    fn next_value(&mut self) -> Option<Result<RtVal, Error>> {
+        self.stream
+            .next_value()
+            .map(|val_res|
+                val_res.and_then(
+                    |val| self.filter_fn.eval(val)))
+    }
+
+    fn eval(&mut self, _input: RtVal) -> Result<RtVal, Error> {
+        panic!("Unsupported operation")
     }
 }
