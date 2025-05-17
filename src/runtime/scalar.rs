@@ -2,7 +2,7 @@ use regex::Regex;
 
 use crate::{error::Error, parse::Expr};
 
-use super::RtVal;
+use super::{RtVal, StreamVar};
 
 /// Runtime components that return scalar values
 pub trait ExecScalar {
@@ -12,12 +12,14 @@ pub trait ExecScalar {
 
 pub enum ScalarNode {
     RegexMatch(RegexMatch),
+    ReadStreamVar(ReadStreamVar),
 }
 
 impl ExecScalar for ScalarNode {
     fn eval(&mut self, input: RtVal) -> Result<RtVal, Error> {
         match self {
             Self::RegexMatch(r) => r.eval(input),
+            Self::ReadStreamVar(rsv) => rsv.eval(input),
         }
     }
 }
@@ -52,5 +54,17 @@ impl ExecScalar for RegexMatch {
         let is_match = self.regex.is_match(&input.str_ref().unwrap());
         let rt_val = is_match.into();
         Ok(rt_val)
+    }
+}
+
+/* ReadStreamVar */
+struct ReadStreamVar {
+    var: StreamVar,
+}
+
+impl ExecScalar for ReadStreamVar {
+    fn eval(&mut self, _input: RtVal) -> Result<RtVal, Error> {
+        let var_content = self.var.read().unwrap();
+        Ok(var_content)
     }
 }

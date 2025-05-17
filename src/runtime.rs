@@ -1,7 +1,7 @@
 mod scalar;
 mod stream;
 
-use std::fmt::Display;
+use std::{cell::Cell, fmt::Display, rc::Rc};
 
 use crate::{error::Error, parse::Expr};
 
@@ -14,6 +14,8 @@ pub fn exec_and_print(expr_tree: Expr) -> Result<(), Error> {
     }
     Ok(())
 }
+
+/* RtVal */
 
 #[derive(Clone)]
 enum RtVal {
@@ -55,5 +57,17 @@ impl From<bool> for RtVal {
 impl From<String> for RtVal {
     fn from(value: String) -> Self {
         Self::String(value)
+    }
+}
+
+/* StreamVar */
+
+/// A variable that acts as a channel, read and written for each
+/// value in a stream.
+struct StreamVar(Rc<Cell<Option<RtVal>>>);
+
+impl StreamVar {
+    fn read(&mut self) -> Option<RtVal> {
+        self.0.take()
     }
 }

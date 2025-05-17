@@ -101,19 +101,25 @@ impl Iterator for StreamFilter {
     fn next(&mut self) -> Option<Result<RtVal, Error>> {
         loop {
             match self.stream.next() {
-                None => return None, // End of the stream
-                same@Some(Err(_)) => return same, // Stream encountered an error
+                // End of the stream
+                None => return None,
+
+                // Stream encountered an error
+                same@Some(Err(_)) => return same,
+
+                // We actually got a value from the stream
                 Some(Ok(rt_val)) => {
-                    // FIXME
                     let keep = rt_val.clone();
                     let predicate_eval = match self.filter_fn.eval(rt_val) {
                         Ok(v) => v,
                         Err(e) => return Some(Err(e)),
                     };
                     if predicate_eval.as_bool().unwrap() {
+                        // The value passes the filter
                         return Some(Ok(keep));
                     }
                     else {
+                        // Value filtered out. Try the next one.
                         continue;
                     }
                 },
