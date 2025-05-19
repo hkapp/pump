@@ -5,6 +5,7 @@ use regex::Regex;
 
 use crate::error::{self, ErrCode, Error};
 
+#[derive(Debug)]
 pub struct Identifier {
     pub name:     String,
     pub position: ParsePos
