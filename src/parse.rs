@@ -10,20 +10,26 @@ pub fn parse(pgm: &str) -> Result<Expr, Error> {
     build_exp_tree(token::tokenize(pgm))
 }
 
-fn build_exp_tree<I: Iterator<Item=Token>>(token_stream: I) -> Result<Expr, Error> {
+fn build_exp_tree<I: Iterator<Item=Result<Token, Error>>>(token_stream: I) -> Result<Expr, Error> {
     let mut tokens =
         token_stream
-            .inspect(|t| eprintln!("next token: {:?}", t))
+            .inspect(
+                |t|
+                    match t {
+                        Ok(t) => eprintln!("next token: {:?}", t),
+                        _ => {},
+                    })
             .peekable();
 
     match tokens.next() {
         Some(t) => {
+            let t = t?;
             // If we can build an expression, we need to validate that the entire stream was used
             build_starting(t, &mut tokens)
                 .and_then(|expr|
                     match tokens.next() {
                         // FIXME turn TooManyExprs into OrphanTokens
-                        Some(trailing) => error::error(ErrCode::TooManyExprs, trailing.position),
+                        Some(trailing) => error::error(ErrCode::TooManyExprs, trailing?.position),
                         None => Ok(expr)
                     })
         },
@@ -31,7 +37,7 @@ fn build_exp_tree<I: Iterator<Item=Token>>(token_stream: I) -> Result<Expr, Erro
     }
 }
 
-fn build_starting<I: Iterator<Item=Token>>(starting_token: Token, rem_tokens: &mut Peekable<I>) -> Result<Expr, Error> {
+fn build_starting<I: Iterator<Item=Result<Token, Error>>>(starting_token: Token, rem_tokens: &mut Peekable<I>) -> Result<Expr, Error> {
     use token::Kind;
     match starting_token.kind {
         Kind::Identifier(starting_idn) => {
@@ -54,21 +60,27 @@ fn resolve_identifier(starting_idn: Identifier) -> Result<Expr, Error> {
     }
 }
 
-fn parse_fun_call<I: Iterator<Item=Token>>(starting_idn: Identifier, rem_tokens: &mut Peekable<I>) -> Result<Expr, Error> {
+fn parse_fun_call<I: Iterator<Item=Result<Token, Error>>>(starting_idn: Identifier, rem_tokens: &mut Peekable<I>) -> Result<Expr, Error> {
     // FIXME need to introduce a separate name resolution phase
     match starting_idn.name.as_str() {
         "filter" => {
             let filter_fn_tok =
-                rem_tokens.next()
-                    .ok_or(error::error::<Token>(ErrCode::NotEnoughArguments, starting_idn.position.right_after() ).unwrap_err())?;
+                match rem_tokens.next() {
+                    None => return error::error(ErrCode::NotEnoughArguments, starting_idn.position.right_after()),
+                    Some(Err(e)) => return Err(e),
+                    Some(Ok(t)) => t,
+                };
 
             let filter_fn_pos = filter_fn_tok.position;
             let filter_fn = trivial_expr(filter_fn_tok);
 
             let data_source =
-                rem_tokens.next()
-                    .map(trivial_expr)
-                    .ok_or(error::error::<Expr>(ErrCode::NotEnoughArguments, filter_fn_pos.right_after()).unwrap_err())?;
+                match rem_tokens.next() {
+                    None => return error::error(ErrCode::NotEnoughArguments, filter_fn_pos.right_after()),
+                    Some(Err(e)) => return Err(e),
+                    Some(Ok(t)) => trivial_expr(t),
+                };
+
             Ok(Expr::Filter { filter_fn: Box::new(filter_fn), data_source: Box::new(data_source) })
         }
         _ => {

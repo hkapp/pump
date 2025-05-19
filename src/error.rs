@@ -39,6 +39,7 @@ pub enum ErrCode {
     TooManyExprs,  // TODO remove
     CantResolve(Identifier),
     NotEnoughArguments,
+    UnrecognizedToken,
 }
 
 impl Display for ErrCode {
@@ -54,6 +55,8 @@ impl Display for ErrCode {
                 write!(f, "Can't resolve identifier {:?}", idn.name),
             ErrCode::NotEnoughArguments =>
                 write!(f, "Not enough arguments in function call"),
+            ErrCode::UnrecognizedToken =>
+                write!(f, "Unrecognized token"),
         }
     }
 }

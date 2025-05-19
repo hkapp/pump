@@ -3,6 +3,8 @@ use std::fmt::Debug;
 
 use regex::Regex;
 
+use crate::error::{self, ErrCode, Error};
+
 pub struct Identifier {
     pub name:     String,
     pub position: ParsePos
@@ -66,7 +68,7 @@ impl Debug for Kind {
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
-    type Item = Token;
+    type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.trim_leading_whitespaces();
@@ -84,12 +86,11 @@ impl<'a> Iterator for Tokenizer<'a> {
         match first_success {
             Some(token) => {
                 self.curr_pos += token.len();
-                Some(token)
+                Some(Ok(token))
             },
             None => {
                 // We could not parse the next token
-                // FIXME return Err instead here
-                panic!("Unrecognized token");
+                Some(error::error(ErrCode::UnrecognizedToken, ParsePos::new_at(self.curr_pos)))
             }
         }
     }
@@ -170,6 +171,10 @@ pub struct ParsePos {
 }
 
 impl ParsePos {
+    fn new_at(pos: usize) -> Self {
+        ParsePos { start: pos, len: 1 }
+    }
+
     // TODO move this function into crate::error
     pub fn format<W: io::Write>(&self, source: &str, buf: &mut W) -> io::Result<()> {
         // TODO support multi-line programs
