@@ -40,6 +40,7 @@ pub enum ErrCode {
     CantResolve(Identifier),
     NotEnoughArguments,
     UnrecognizedToken,
+    NotAFunction,
 }
 
 impl Display for ErrCode {
@@ -57,6 +58,8 @@ impl Display for ErrCode {
                 write!(f, "Not enough arguments in function call"),
             ErrCode::UnrecognizedToken =>
                 write!(f, "Unrecognized token"),
+            ErrCode::NotAFunction =>
+                write!(f, "Not a function"),
         }
     }
 }

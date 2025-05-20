@@ -2,7 +2,7 @@ mod token;
 
 pub use token::{ParsePos, Identifier, Token};
 
-use std::iter::Peekable;
+use std::{iter::Peekable, ops::DerefMut};
 
 use crate::error::{self, Error, ErrCode};
 
@@ -21,6 +21,7 @@ pub enum Expr {
     /* Scalars */
     RegexMatch(regex::Regex, ParsePos),
     UnresolvedIdentifier(Identifier),
+    FunCall { function: Box<Expr>, arguments: Vec<Expr> },
 }
 
 impl Expr {
@@ -32,10 +33,15 @@ impl Expr {
             Self::RegexMatch(..) => Vec::new(),
             Self::Stdin => Vec::new(),
             Self::UnresolvedIdentifier(_) => Vec::new(),
+            Self::FunCall { function, arguments } => {
+                let mut children = vec![function.deref_mut()];
+                children.extend(arguments.iter_mut());
+                children
+            }
         }
     }
 
-    fn get_child_mut(&mut self, index: usize) -> Option<&mut Self> {
+    /*fn get_child_mut(&mut self, index: usize) -> Option<&mut Self> {
         match self {
             Self::Filter { filter_fn, data_source } => {
                 match index {
@@ -47,6 +53,20 @@ impl Expr {
             Self::RegexMatch(..) => None,
             Self::Stdin => None,
             Self::UnresolvedIdentifier(_) => None,
+        }
+    }*/
+
+    // TODO turn into a trait
+    fn position(&self) -> ParsePos {
+        match self {
+            Expr::FunCall { function, .. } =>
+                // TODO introduce a parse pos merging
+                function.position(),
+            Expr::UnresolvedIdentifier(idn) =>
+                idn.position,
+            _ =>
+                // FIXME this is terrible
+                todo!(),
         }
     }
 }
@@ -90,63 +110,53 @@ fn build_exp_tree<I: Iterator<Item=Result<Token, Error>>>(token_stream: I) -> Re
                     })
             .peekable();
 
-    match tokens.next() {
-        Some(t) => {
-            let t = t?;
-            // If we can build an expression, we need to validate that the entire stream was used
-            build_starting(t, &mut tokens)
-                .and_then(|expr|
-                    match tokens.next() {
-                        // FIXME turn TooManyExprs into OrphanTokens
-                        Some(trailing) => error::error(ErrCode::TooManyExprs, trailing?.position),
-                        None => Ok(expr)
-                    })
-        },
-        None => error::error_no_pos(ErrCode::EmptyProgram),
+    if tokens.peek().is_none() {
+        return error::error_no_pos(ErrCode::EmptyProgram);
+    }
+    else {
+        let final_tree = build_next_tree(&mut tokens)?;
+
+        match tokens.next() {
+            Some(Ok(trailing)) =>
+                // We have more tokens, but we should have reached the end of the stream
+                // FIXME turn TooManyExprs into OrphanTokens
+                return error::error(ErrCode::TooManyExprs, trailing.position),
+            Some(Err(e)) =>
+                // The tokenizer had an issue, just pass it along
+                return Err(e),
+            None =>
+                // We reached the end of the stream (as expected)
+                Ok(final_tree),
+        }
     }
 }
 
-fn build_starting<I: Iterator<Item=Result<Token, Error>>>(starting_token: Token, rem_tokens: &mut Peekable<I>) -> Result<Expr, Error> {
-    use token::Kind;
-    match starting_token.kind {
-        Kind::Identifier(starting_idn) => {
-            match rem_tokens.peek() {
-                None    => resolve_identifier(starting_idn),
-                Some(_) => parse_fun_call(starting_idn, rem_tokens),
-            }
-        }
-        Kind::RegexMatch(regex) => Ok(Expr::RegexMatch(regex, starting_token.position)),
+// Pre-condition: the token stream has been peeked and is known to have at least one more token
+fn build_next_tree<I: Iterator<Item=Result<Token, Error>>>(tokens: &mut Peekable<I>) -> Result<Expr, Error> {
+    let first_token = tokens.next().unwrap()?;
+    let first_atom = trivial_expr(first_token);
+
+    if tokens.peek().is_some() {
+        // There are more tokens: we assume a function call
+        parse_fun_call(first_atom, tokens)
+    }
+    else {
+        // No more token: that's all we have
+        Ok(first_atom)
     }
 }
 
-fn parse_fun_call<I: Iterator<Item=Result<Token, Error>>>(starting_idn: Identifier, rem_tokens: &mut Peekable<I>) -> Result<Expr, Error> {
-    // FIXME need to introduce a separate name resolution phase
-    match starting_idn.name.as_str() {
-        "filter" => {
-            let filter_fn_tok =
-                match rem_tokens.next() {
-                    None => return error::error(ErrCode::NotEnoughArguments, starting_idn.position.right_after()),
-                    Some(Err(e)) => return Err(e),
-                    Some(Ok(t)) => t,
-                };
+fn parse_fun_call<I: Iterator<Item=Result<Token, Error>>>(first_token: Expr, rem_tokens: &mut Peekable<I>) -> Result<Expr, Error> {
+    let mut args = Vec::new();
 
-            let filter_fn_pos = filter_fn_tok.position;
-            let filter_fn = trivial_expr(filter_fn_tok);
-
-            let data_source =
-                match rem_tokens.next() {
-                    None => return error::error(ErrCode::NotEnoughArguments, filter_fn_pos.right_after()),
-                    Some(Err(e)) => return Err(e),
-                    Some(Ok(t)) => trivial_expr(t),
-                };
-
-            Ok(Expr::Filter { filter_fn: Box::new(filter_fn), data_source: Box::new(data_source) })
-        }
-        _ => {
-            let err_pos = starting_idn.position;
-            error::error(ErrCode::CantResolve(starting_idn), err_pos)
-        },
+    for token_res in rem_tokens {
+        let token = token_res?;
+        let this_arg = trivial_expr(token);
+        args.push(this_arg);
     }
+
+    let fun_call = Expr::FunCall { function: Box::new(first_token), arguments: args };
+    Ok(fun_call)
 }
 
 /* Name resolution */
@@ -157,6 +167,10 @@ fn name_resolution(expr_tree: &mut Expr) -> Result<(), Error> {
             let dummy = Identifier { name: String::new(), position: idn.position };
             let idn = std::mem::replace(idn, dummy);
             *expr_tree = resolve_identifier(idn)?;
+        }
+        // Here we cheat a bit
+        Expr::FunCall { function, arguments } => {
+            *expr_tree = resolve_fun_call(function, arguments)?;
         }
         _ => {},
     }
@@ -176,5 +190,42 @@ fn resolve_identifier(starting_idn: Identifier) -> Result<Expr, Error> {
             let idn_pos = starting_idn.position;
             error::error(ErrCode::CantResolve(starting_idn), idn_pos)
         },
+    }
+}
+
+fn resolve_fun_call(function: &mut Expr, arguments: &mut Vec<Expr>) -> Result<Expr, Error> {
+    match function {
+        Expr::UnresolvedIdentifier(idn) => {
+            match idn.name.as_str() {
+                "filter" => filter_from_fun_call(std::mem::take(arguments), idn.position),
+                _ => error::error(ErrCode::CantResolve(idn.take()), idn.position),
+            }
+        }
+        _ => error::error(ErrCode::NotAFunction, function.position()),
+    }
+}
+
+fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, Error> {
+    match args.len() {
+        0 => {
+            // Not enough arguments
+            error::error(ErrCode::NotEnoughArguments, fn_pos.right_after())
+        },
+        1 => {
+            // Not enough arguments
+            error::error(ErrCode::NotEnoughArguments, args[0].position().right_after())
+        },
+        2 => {
+            // Right number of arguments: build the Expr
+            // Note: we get the arguments in reverse order because of pop()
+            let data_source = args.pop().unwrap();
+            let filter_fn = args.pop().unwrap();
+
+            Ok(Expr::Filter { filter_fn: Box::new(filter_fn), data_source: Box::new(data_source) })
+        },
+        _ => {
+            // Too many arguments
+            error::error(ErrCode::TooManyArguments, args[2].position())
+        }
     }
 }

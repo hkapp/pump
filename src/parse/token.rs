@@ -21,6 +21,16 @@ impl Identifier {
             };
         Token { position: pos, kind: Kind::Identifier(idn) }
     }
+
+    /// Take ownership of an identifier behind a ref mut,
+    /// leaving the ref pointed Identifier in a Rust-valid but
+    /// semantically invalid state.
+    pub fn take(&mut self) -> Self {
+        // Note: the docs tell us that String::new() does not lead to an allocation
+        let name = std::mem::replace(&mut self.name, String::new());
+        let position = self.position;
+        Self { name, position }
+    }
 }
 
 pub fn tokenize<'a>(s: &'a str) -> Tokenizer<'a> {
