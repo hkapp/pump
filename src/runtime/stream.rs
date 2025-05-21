@@ -89,8 +89,13 @@ impl StreamFilter {
 
         let (back_channel_for_me, back_channel_for_them) = StreamVar::new_pair();
 
+        // Compile the filter function as a function call
+        let back_channel_read = Expr::ReadVar(back_channel_for_them);
+        let filter_fun_call = Expr::FunCall { function: filter_fn, arguments: vec![back_channel_read] };
+        let rt_filter_fn = scalar::scalar_from(filter_fun_call);
+
         let filter = StreamFilter {
-            filter_fn:    box_map(filter_fn, scalar::scalar_from),
+            filter_fn:    Box::new(rt_filter_fn),
             back_channel: back_channel_for_me,
             stream:       box_map(data_source, stream_from),
         };

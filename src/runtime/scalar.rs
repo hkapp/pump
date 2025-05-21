@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use regex::Regex;
 
 use crate::{error::Error, parse::Expr};
@@ -27,10 +29,27 @@ impl ExecScalar for ScalarNode {
 // TODO convert into From impl
 pub fn scalar_from(expr: Expr) -> ScalarNode {
     match expr {
+        Expr::FunCall { function, arguments } =>
+            scalar_fun_call(*function, arguments),
+
+        Expr::ReadVar(var) => ReadStreamVar::new_node(var),
+
         Expr::RegexMatch(..) => panic!("We don't expect a RegexMatch outside of a FunCall anymore"),
+
         // It's fine for us to panic here, as typechecking must have guaranteed that
         // we have what our caller expects here
         _ => panic!("Not a scalar: {:?}", expr),
+    }
+}
+
+fn scalar_fun_call(function: Expr, mut arguments: Vec<Expr>) -> ScalarNode {
+    match function {
+        Expr::RegexMatch(regex, pos) => {
+            assert_eq!(arguments.len(), 1);
+            let single_arg = arguments.pop().unwrap();
+            RegexMatch::new_node(regex, single_arg)
+        }
+        _ => todo!(),
     }
 }
 
@@ -62,6 +81,13 @@ impl ExecScalar for RegexMatch {
 /* ReadStreamVar */
 struct ReadStreamVar {
     var: StreamVar,
+}
+
+impl ReadStreamVar {
+    fn new_node(var: StreamVar) -> ScalarNode {
+        let me = Self { var };
+        ScalarNode::ReadStreamVar(me)
+    }
 }
 
 impl ExecScalar for ReadStreamVar {
