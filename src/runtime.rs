@@ -1,7 +1,7 @@
 mod scalar;
 mod stream;
 
-use std::{cell::Cell, fmt::Display, rc::Rc};
+use std::{cell::Cell, fmt::{Debug, Display}, rc::Rc};
 
 use crate::{error::Error, parse::Expr};
 
@@ -42,8 +42,8 @@ impl RtVal {
 impl Display for RtVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::String(s) => s.fmt(f),
-            Self::Bool(b) => b.fmt(f),
+            Self::String(s) => Display::fmt(s, f),
+            Self::Bool(b) => Display::fmt(b, f),
         }
     }
 }
@@ -64,7 +64,7 @@ impl From<String> for RtVal {
 
 /// A variable that acts as a channel, read and written for each
 /// value in a stream.
-struct StreamVar(Rc<Cell<Option<RtVal>>>);
+pub struct StreamVar(Rc<Cell<Option<RtVal>>>);
 
 impl StreamVar {
     // We don't have the concept of Reader and Writer yet,
@@ -91,5 +91,11 @@ impl StreamVar {
 
         // For now, we require that every written value is read exactly once
         assert!(old_value.is_none());
+    }
+}
+
+impl Debug for StreamVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StreamVar({:?})", self.0.as_ptr())
     }
 }

@@ -4,7 +4,7 @@ pub use token::{ParsePos, Identifier, Token};
 
 use std::{iter::Peekable, ops::DerefMut};
 
-use crate::error::{self, Error, ErrCode};
+use crate::{error::{self, ErrCode, Error}, runtime};
 
 pub fn parse(pgm: &str) -> Result<Expr, Error> {
     let tokens = token::tokenize(pgm);
@@ -22,6 +22,7 @@ pub enum Expr {
     RegexMatch(regex::Regex, ParsePos),
     UnresolvedIdentifier(Identifier),
     FunCall { function: Box<Expr>, arguments: Vec<Expr> },
+    ReadVar(runtime::StreamVar),
 }
 
 impl Expr {
@@ -37,7 +38,8 @@ impl Expr {
                 let mut children = vec![function.deref_mut()];
                 children.extend(arguments.iter_mut());
                 children
-            }
+            },
+            Self::ReadVar(_) => Vec::new(),
         }
     }
 
