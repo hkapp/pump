@@ -4,7 +4,7 @@ pub mod runtime;
 
 use std::env;
 
-use error::{Error, ErrCode};
+use error::Error;
 
 fn main() {
     let pgm = retrieve_program();
@@ -20,7 +20,6 @@ fn main() {
             }
         }
         // This arm is different because we don't have an input source to use for proper error formatting
-        // TODO merge
         Err(e) => {
             eprintln!("pump: {}", e);
             std::process::exit(1); // TODO use the error to get a return code
@@ -28,13 +27,13 @@ fn main() {
     }
 }
 
-fn retrieve_program() -> Result<String, ErrCode> {
+fn retrieve_program() -> Result<String, Error> {
     let mut args: Vec<String> = env::args().skip(1).collect();
 
     match args.len() {
-        0 => Err(ErrCode::EmptyProgram),
+        0 => Err(Error::EmptyProgram),
         1 => Ok(args.pop().unwrap()),
-        _ => Err(ErrCode::TooManyCliArgs),
+        _ => Err(Error::TooManyCliArgs),
     }
 }
 

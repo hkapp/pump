@@ -2,10 +2,6 @@ use std::{fmt::Display, io};
 
 use crate::parse::{ParsePos, Identifier};
 
-/// The same as Error
-// TODO remove
-pub type ErrCode = Error;
-
 pub enum Error {
     EmptyProgram,
     TooManyCliArgs,
@@ -32,14 +28,14 @@ impl Error {
 
     fn position(&self) -> Option<ParsePos> {
         match &self {
-            ErrCode::EmptyProgram => None,
-            ErrCode::TooManyCliArgs => None,
-            ErrCode::TooManyExprs(err_pos) => Some(*err_pos),
-            ErrCode::CantResolve(idn) => Some(idn.position),
-            ErrCode::NotEnoughArguments(err_pos) => Some(*err_pos),
-            ErrCode::TooManyArguments(err_pos) => Some(*err_pos),
-            ErrCode::UnrecognizedToken(err_pos) => Some(*err_pos),
-            ErrCode::NotAFunction(err_pos) => Some(*err_pos),
+            Error::EmptyProgram => None,
+            Error::TooManyCliArgs => None,
+            Error::TooManyExprs(err_pos) => Some(*err_pos),
+            Error::CantResolve(idn) => Some(idn.position),
+            Error::NotEnoughArguments(err_pos) => Some(*err_pos),
+            Error::TooManyArguments(err_pos) => Some(*err_pos),
+            Error::UnrecognizedToken(err_pos) => Some(*err_pos),
+            Error::NotAFunction(err_pos) => Some(*err_pos),
         }
     }
 }
@@ -49,24 +45,24 @@ fn write_error_line<W: io::Write>(err_pos: ParsePos, buf: &mut W) -> io::Result<
     writeln!(buf, "{}{}", str::repeat(" ", err_pos.start), str::repeat("^", err_pos.len))
 }
 
-impl Display for ErrCode {
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrCode::EmptyProgram =>
+            Error::EmptyProgram =>
                 write!(f, "Program is empty. Provide at least one expression."),
-            ErrCode::TooManyCliArgs =>
+            Error::TooManyCliArgs =>
                 write!(f, "Too many command line arguments"),
-            ErrCode::TooManyExprs(_) =>
+            Error::TooManyExprs(_) =>
                 write!(f, "Too many expressions (we only support 1 right now)"),
-            ErrCode::CantResolve(idn) =>
+            Error::CantResolve(idn) =>
                 write!(f, "Can't resolve identifier {:?}", idn.name),
-            ErrCode::NotEnoughArguments(_) =>
+            Error::NotEnoughArguments(_) =>
                 write!(f, "Not enough arguments in function call"),
-            ErrCode::TooManyArguments(_) =>
+            Error::TooManyArguments(_) =>
                 write!(f, "Too many arguments in function call"),
-            ErrCode::UnrecognizedToken(_) =>
+            Error::UnrecognizedToken(_) =>
                 write!(f, "Unrecognized token"),
-            ErrCode::NotAFunction(_) =>
+            Error::NotAFunction(_) =>
                 write!(f, "Not a function"),
         }
     }
