@@ -123,7 +123,7 @@ fn build_exp_tree<I: Iterator<Item=Result<Token, Error>>>(token_stream: I) -> Re
             Some(Ok(trailing)) =>
                 // We have more tokens, but we should have reached the end of the stream
                 // FIXME turn TooManyExprs into OrphanTokens
-                return error::error(ErrCode::TooManyExprs(trailing.position), trailing.position),
+                return error::error(ErrCode::TooManyExprs(trailing.position)),
             Some(Err(e)) =>
                 // The tokenizer had an issue, just pass it along
                 return Err(e),
@@ -189,10 +189,7 @@ fn name_resolution(expr_tree: &mut Expr) -> Result<(), Error> {
 fn resolve_identifier(starting_idn: Identifier) -> Result<Expr, Error> {
     match starting_idn.name.as_str() {
         "stdin" => Ok(Expr::Stdin),
-        _       => {
-            let idn_pos = starting_idn.position;
-            error::error(ErrCode::CantResolve(starting_idn), idn_pos)
-        },
+        _       => error::error(ErrCode::CantResolve(starting_idn)),
     }
 }
 
@@ -201,10 +198,10 @@ fn resolve_fun_call(function: &mut Expr, arguments: &mut Vec<Expr>) -> Result<Ex
         Expr::UnresolvedIdentifier(idn) => {
             match idn.name.as_str() {
                 "filter" => filter_from_fun_call(std::mem::take(arguments), idn.position),
-                _ => error::error(ErrCode::NotAFunction(idn.position), idn.position),
+                _ => error::error(ErrCode::NotAFunction(idn.position)),
             }
         }
-        _ => error::error(ErrCode::NotAFunction(function.position()), function.position()),
+        _ => error::error(ErrCode::NotAFunction(function.position())),
     }
 }
 
@@ -212,11 +209,11 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
     match args.len() {
         0 => {
             // Not enough arguments
-            error::error(ErrCode::NotEnoughArguments(fn_pos.right_after()), fn_pos.right_after())
+            error::error(ErrCode::NotEnoughArguments(fn_pos.right_after()))
         },
         1 => {
             // Not enough arguments
-            error::error(ErrCode::NotEnoughArguments(args[0].position().right_after()), args[0].position().right_after())
+            error::error(ErrCode::NotEnoughArguments(args[0].position().right_after()))
         },
         2 => {
             // Right number of arguments: build the Expr
@@ -228,7 +225,7 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
         },
         _ => {
             // Too many arguments
-            error::error(ErrCode::TooManyArguments(args[2].position()), args[2].position())
+            error::error(ErrCode::TooManyArguments(args[2].position()))
         }
     }
 }

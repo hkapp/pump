@@ -8,7 +8,7 @@ pub struct Error {
 }
 
 impl Error {
-    fn new(err_code: ErrCode, err_pos: ParsePos) -> Self {
+    fn new(err_code: ErrCode) -> Self {
         Error {
             error_code: err_code
         }
@@ -46,14 +46,15 @@ fn write_error_line<W: io::Write>(err_pos: ParsePos, buf: &mut W) -> io::Result<
 }
 
 /// Will always return Err
-pub fn error<T>(err_code: ErrCode, err_pos: ParsePos) -> Result<T, Error> {
-    Err(Error::new(err_code, err_pos))
+// TODO remove
+pub fn error<T>(err_code: ErrCode) -> Result<T, Error> {
+    Err(Error::new(err_code))
 }
 
 /// Will always return Err
 // FIXME introduce the actual concept of "no position"
 pub fn error_no_pos<T>(err_code: ErrCode) -> Result<T, Error> {
-    Err(Error::new(err_code, ParsePos{ start: 0, len: 1 }))
+    Err(Error::new(err_code))
 }
 
 pub enum ErrCode {
