@@ -3,23 +3,44 @@ use std::{fmt::Display, io};
 use crate::parse::{ParsePos, Identifier};
 
 pub struct Error {
-    position:   ParsePos,
     error_code: ErrCode
 }
 
 impl Error {
     fn new(err_code: ErrCode, err_pos: ParsePos) -> Self {
         Error {
-            position:   err_pos,
             error_code: err_code
         }
     }
 
     pub fn format<W: io::Write>(&self, source: &str, buf: &mut W) -> io::Result<()> {
-        self.position.format(source, buf)?;
-        writeln!(buf)?;
+        match self.position() {
+            Some(p) => {
+                writeln!(buf, "{}", source)?;
+                write_error_line(p, buf)?;
+            },
+            None => { },
+        }
+
         write!(buf, "pump: {}", self.error_code)
     }
+
+    fn position(&self) -> Option<ParsePos> {
+        match &self.error_code {
+            ErrCode::EmptyProgram => None,
+            ErrCode::TooManyArguments => None,
+            ErrCode::TooManyExprs => None,
+            ErrCode::CantResolve(identifier) => Some(identifier.position),
+            ErrCode::NotEnoughArguments => None,
+            ErrCode::UnrecognizedToken => None,
+            ErrCode::NotAFunction => None,
+        }
+    }
+}
+
+fn write_error_line<W: io::Write>(err_pos: ParsePos, buf: &mut W) -> io::Result<()> {
+    // TODO support multi-line programs
+    writeln!(buf, "{}{}", str::repeat(" ", err_pos.start), str::repeat("^", err_pos.len))
 }
 
 /// Will always return Err

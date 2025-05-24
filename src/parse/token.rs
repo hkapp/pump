@@ -186,13 +186,6 @@ impl ParsePos {
         ParsePos { start: pos, len: 1 }
     }
 
-    // TODO move this function into crate::error
-    pub fn format<W: io::Write>(&self, source: &str, buf: &mut W) -> io::Result<()> {
-        // TODO support multi-line programs
-        writeln!(buf, "{}", source)?;
-        write!(buf, "{}{}", str::repeat(" ", self.start), str::repeat("^", self.len))
-    }
-
     fn from(m: &regex::Match) -> Self {
         ParsePos {
             start: m.start(),
