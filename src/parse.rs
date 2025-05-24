@@ -200,10 +200,10 @@ fn resolve_fun_call(function: &mut Expr, arguments: &mut Vec<Expr>) -> Result<Ex
         Expr::UnresolvedIdentifier(idn) => {
             match idn.name.as_str() {
                 "filter" => filter_from_fun_call(std::mem::take(arguments), idn.position),
-                _ => error::error(ErrCode::CantResolve(idn.take()), idn.position),
+                _ => error::error(ErrCode::NotAFunction(idn.position), idn.position),
             }
         }
-        _ => error::error(ErrCode::NotAFunction, function.position()),
+        _ => error::error(ErrCode::NotAFunction(function.position()), function.position()),
     }
 }
 

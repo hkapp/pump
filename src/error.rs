@@ -2,6 +2,7 @@ use std::{fmt::Display, io};
 
 use crate::parse::{ParsePos, Identifier};
 
+// TODO remove
 pub struct Error {
     error_code: ErrCode
 }
@@ -30,10 +31,10 @@ impl Error {
             ErrCode::EmptyProgram => None,
             ErrCode::TooManyArguments => None,
             ErrCode::TooManyExprs => None,
-            ErrCode::CantResolve(identifier) => Some(identifier.position),
+            ErrCode::CantResolve(idn) => Some(idn.position),
             ErrCode::NotEnoughArguments => None,
             ErrCode::UnrecognizedToken => None,
-            ErrCode::NotAFunction => None,
+            ErrCode::NotAFunction(err_pos) => Some(*err_pos),
         }
     }
 }
@@ -61,7 +62,7 @@ pub enum ErrCode {
     CantResolve(Identifier),
     NotEnoughArguments,
     UnrecognizedToken,
-    NotAFunction,
+    NotAFunction(ParsePos),
 }
 
 impl Display for ErrCode {
@@ -79,7 +80,7 @@ impl Display for ErrCode {
                 write!(f, "Not enough arguments in function call"),
             ErrCode::UnrecognizedToken =>
                 write!(f, "Unrecognized token"),
-            ErrCode::NotAFunction =>
+            ErrCode::NotAFunction(_) =>
                 write!(f, "Not a function"),
         }
     }

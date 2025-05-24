@@ -20,6 +20,7 @@ fn main() {
             }
         }
         // This arm is different because we don't have an input source to use for proper error formatting
+        // TODO merge
         Err(e) => {
             eprintln!("pump: {}", e);
             std::process::exit(1); // TODO use the error to get a return code
