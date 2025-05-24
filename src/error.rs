@@ -2,18 +2,22 @@ use std::{fmt::Display, io};
 
 use crate::parse::{ParsePos, Identifier};
 
+/// The same as Error
 // TODO remove
-pub struct Error {
-    error_code: ErrCode
+pub type ErrCode = Error;
+
+pub enum Error {
+    EmptyProgram,
+    TooManyCliArgs,
+    TooManyExprs(ParsePos),  // TODO remove
+    CantResolve(Identifier),
+    NotEnoughArguments(ParsePos),
+    TooManyArguments(ParsePos),
+    UnrecognizedToken(ParsePos),
+    NotAFunction(ParsePos),
 }
 
 impl Error {
-    fn new(err_code: ErrCode) -> Self {
-        Error {
-            error_code: err_code
-        }
-    }
-
     pub fn format<W: io::Write>(&self, source: &str, buf: &mut W) -> io::Result<()> {
         match self.position() {
             Some(p) => {
@@ -23,11 +27,11 @@ impl Error {
             None => { },
         }
 
-        write!(buf, "pump: {}", self.error_code)
+        write!(buf, "pump: {}", self)
     }
 
     fn position(&self) -> Option<ParsePos> {
-        match &self.error_code {
+        match &self {
             ErrCode::EmptyProgram => None,
             ErrCode::TooManyCliArgs => None,
             ErrCode::TooManyExprs(err_pos) => Some(*err_pos),
@@ -48,24 +52,13 @@ fn write_error_line<W: io::Write>(err_pos: ParsePos, buf: &mut W) -> io::Result<
 /// Will always return Err
 // TODO remove
 pub fn error<T>(err_code: ErrCode) -> Result<T, Error> {
-    Err(Error::new(err_code))
+    Err(err_code)
 }
 
 /// Will always return Err
 // FIXME introduce the actual concept of "no position"
 pub fn error_no_pos<T>(err_code: ErrCode) -> Result<T, Error> {
-    Err(Error::new(err_code))
-}
-
-pub enum ErrCode {
-    EmptyProgram,
-    TooManyCliArgs,
-    TooManyExprs(ParsePos),  // TODO remove
-    CantResolve(Identifier),
-    NotEnoughArguments(ParsePos),
-    TooManyArguments(ParsePos),
-    UnrecognizedToken(ParsePos),
-    NotAFunction(ParsePos),
+    Err(err_code)
 }
 
 impl Display for ErrCode {
