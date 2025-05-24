@@ -2,7 +2,7 @@ mod token;
 
 pub use token::{ParsePos, Identifier, Token};
 
-use std::{iter::Peekable, ops::DerefMut};
+use std::{fmt::Display, iter::Peekable, ops::DerefMut};
 
 use crate::{error::Error, runtime};
 
@@ -71,6 +71,11 @@ impl Expr {
                 // FIXME this is terrible
                 todo!(),
         }
+    }
+
+    // This is a weird trick to get println statements to look decent
+    pub fn pretty_print(&self) -> &Self {
+        self
     }
 }
 
@@ -226,6 +231,35 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
         _ => {
             // Too many arguments
             Err(Error::TooManyArguments(args[2].position()))
+        }
+    }
+}
+
+/* Pretty printing */
+
+impl Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Stdin => write!(f, "stdin"),
+            Expr::Filter { filter_fn, data_source } => {
+                write!(f, "filter {} {}", filter_fn, data_source)
+            },
+            Expr::RegexMatch(re, _) => {
+                write!(f, "m/{}/", re.as_str())
+            },
+            Expr::UnresolvedIdentifier(identifier) => {
+                write!(f, "?:{}:?", identifier.name)
+            },
+            Expr::FunCall { function, arguments } => {
+                write!(f, "{}", function)?;
+                for arg in arguments {
+                    write!(f, " {}", arg)?;
+                }
+                Ok(())
+            },
+            Expr::ReadVar(stream_var) => {
+                write!(f, "(read {:?})", stream_var)
+            },
         }
     }
 }

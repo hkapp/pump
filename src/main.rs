@@ -40,6 +40,6 @@ fn retrieve_program() -> Result<String, Error> {
 fn submain(pgm: &str) -> Result<(), Error> {
     eprintln!("Program: {}", pgm);
     let expr_tree = parse::parse(&pgm)?;
-    eprintln!("Parsed program: {:?}", expr_tree);
+    eprintln!("Parsed program: {}", expr_tree.pretty_print());
     runtime::exec_and_print(expr_tree)
 }
