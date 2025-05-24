@@ -101,7 +101,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             },
             None => {
                 // We could not parse the next token
-                Some(error::error(ErrCode::UnrecognizedToken, ParsePos::new_at(self.curr_pos)))
+                Some(error::error(ErrCode::UnrecognizedToken(ParsePos::new_at(self.curr_pos)), ParsePos::new_at(self.curr_pos)))
             }
         }
     }

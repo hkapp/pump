@@ -66,6 +66,7 @@ impl Expr {
                 function.position(),
             Expr::UnresolvedIdentifier(idn) =>
                 idn.position,
+            Expr::RegexMatch(_, pos) => *pos,
             _ =>
                 // FIXME this is terrible
                 todo!(),
@@ -122,7 +123,7 @@ fn build_exp_tree<I: Iterator<Item=Result<Token, Error>>>(token_stream: I) -> Re
             Some(Ok(trailing)) =>
                 // We have more tokens, but we should have reached the end of the stream
                 // FIXME turn TooManyExprs into OrphanTokens
-                return error::error(ErrCode::TooManyExprs, trailing.position),
+                return error::error(ErrCode::TooManyExprs(trailing.position), trailing.position),
             Some(Err(e)) =>
                 // The tokenizer had an issue, just pass it along
                 return Err(e),
@@ -211,11 +212,11 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
     match args.len() {
         0 => {
             // Not enough arguments
-            error::error(ErrCode::NotEnoughArguments, fn_pos.right_after())
+            error::error(ErrCode::NotEnoughArguments(fn_pos.right_after()), fn_pos.right_after())
         },
         1 => {
             // Not enough arguments
-            error::error(ErrCode::NotEnoughArguments, args[0].position().right_after())
+            error::error(ErrCode::NotEnoughArguments(args[0].position().right_after()), args[0].position().right_after())
         },
         2 => {
             // Right number of arguments: build the Expr
@@ -227,7 +228,7 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
         },
         _ => {
             // Too many arguments
-            error::error(ErrCode::TooManyArguments, args[2].position())
+            error::error(ErrCode::TooManyArguments(args[2].position()), args[2].position())
         }
     }
 }

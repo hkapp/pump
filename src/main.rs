@@ -34,7 +34,7 @@ fn retrieve_program() -> Result<String, ErrCode> {
     match args.len() {
         0 => Err(ErrCode::EmptyProgram),
         1 => Ok(args.pop().unwrap()),
-        _ => Err(ErrCode::TooManyArguments),
+        _ => Err(ErrCode::TooManyCliArgs),
     }
 }
 

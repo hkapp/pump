@@ -29,11 +29,12 @@ impl Error {
     fn position(&self) -> Option<ParsePos> {
         match &self.error_code {
             ErrCode::EmptyProgram => None,
-            ErrCode::TooManyArguments => None,
-            ErrCode::TooManyExprs => None,
+            ErrCode::TooManyCliArgs => None,
+            ErrCode::TooManyExprs(err_pos) => Some(*err_pos),
             ErrCode::CantResolve(idn) => Some(idn.position),
-            ErrCode::NotEnoughArguments => None,
-            ErrCode::UnrecognizedToken => None,
+            ErrCode::NotEnoughArguments(err_pos) => Some(*err_pos),
+            ErrCode::TooManyArguments(err_pos) => Some(*err_pos),
+            ErrCode::UnrecognizedToken(err_pos) => Some(*err_pos),
             ErrCode::NotAFunction(err_pos) => Some(*err_pos),
         }
     }
@@ -57,11 +58,12 @@ pub fn error_no_pos<T>(err_code: ErrCode) -> Result<T, Error> {
 
 pub enum ErrCode {
     EmptyProgram,
-    TooManyArguments,
-    TooManyExprs,  // TODO remove
+    TooManyCliArgs,
+    TooManyExprs(ParsePos),  // TODO remove
     CantResolve(Identifier),
-    NotEnoughArguments,
-    UnrecognizedToken,
+    NotEnoughArguments(ParsePos),
+    TooManyArguments(ParsePos),
+    UnrecognizedToken(ParsePos),
     NotAFunction(ParsePos),
 }
 
@@ -70,15 +72,17 @@ impl Display for ErrCode {
         match self {
             ErrCode::EmptyProgram =>
                 write!(f, "Program is empty. Provide at least one expression."),
-            ErrCode::TooManyArguments =>
+            ErrCode::TooManyCliArgs =>
                 write!(f, "Too many command line arguments"),
-            ErrCode::TooManyExprs =>
+            ErrCode::TooManyExprs(_) =>
                 write!(f, "Too many expressions (we only support 1 right now)"),
             ErrCode::CantResolve(idn) =>
                 write!(f, "Can't resolve identifier {:?}", idn.name),
-            ErrCode::NotEnoughArguments =>
+            ErrCode::NotEnoughArguments(_) =>
                 write!(f, "Not enough arguments in function call"),
-            ErrCode::UnrecognizedToken =>
+            ErrCode::TooManyArguments(_) =>
+                write!(f, "Too many arguments in function call"),
+            ErrCode::UnrecognizedToken(_) =>
                 write!(f, "Unrecognized token"),
             ErrCode::NotAFunction(_) =>
                 write!(f, "Not a function"),
