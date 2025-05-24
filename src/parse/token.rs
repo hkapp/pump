@@ -1,9 +1,8 @@
-use std::io;
 use std::fmt::Debug;
 
 use regex::Regex;
 
-use crate::error::{self, ErrCode, Error};
+use crate::error::Error;
 
 #[derive(Debug)]
 pub struct Identifier {
@@ -101,7 +100,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             },
             None => {
                 // We could not parse the next token
-                Some(error::error(ErrCode::UnrecognizedToken(ParsePos::new_at(self.curr_pos))))
+                Some(Err(Error::UnrecognizedToken(ParsePos::new_at(self.curr_pos))))
             }
         }
     }

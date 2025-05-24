@@ -1,5 +1,3 @@
-use std::io::Read;
-
 use regex::Regex;
 
 use crate::{error::Error, parse::Expr};

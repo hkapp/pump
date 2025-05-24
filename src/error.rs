@@ -49,18 +49,6 @@ fn write_error_line<W: io::Write>(err_pos: ParsePos, buf: &mut W) -> io::Result<
     writeln!(buf, "{}{}", str::repeat(" ", err_pos.start), str::repeat("^", err_pos.len))
 }
 
-/// Will always return Err
-// TODO remove
-pub fn error<T>(err_code: ErrCode) -> Result<T, Error> {
-    Err(err_code)
-}
-
-/// Will always return Err
-// FIXME introduce the actual concept of "no position"
-pub fn error_no_pos<T>(err_code: ErrCode) -> Result<T, Error> {
-    Err(err_code)
-}
-
 impl Display for ErrCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

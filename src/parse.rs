@@ -4,7 +4,7 @@ pub use token::{ParsePos, Identifier, Token};
 
 use std::{iter::Peekable, ops::DerefMut};
 
-use crate::{error::{self, ErrCode, Error}, runtime};
+use crate::{error::Error, runtime};
 
 pub fn parse(pgm: &str) -> Result<Expr, Error> {
     let tokens = token::tokenize(pgm);
@@ -114,7 +114,7 @@ fn build_exp_tree<I: Iterator<Item=Result<Token, Error>>>(token_stream: I) -> Re
             .peekable();
 
     if tokens.peek().is_none() {
-        return error::error_no_pos(ErrCode::EmptyProgram);
+        return Err(Error::EmptyProgram);
     }
     else {
         let final_tree = build_next_tree(&mut tokens)?;
@@ -123,7 +123,7 @@ fn build_exp_tree<I: Iterator<Item=Result<Token, Error>>>(token_stream: I) -> Re
             Some(Ok(trailing)) =>
                 // We have more tokens, but we should have reached the end of the stream
                 // FIXME turn TooManyExprs into OrphanTokens
-                return error::error(ErrCode::TooManyExprs(trailing.position)),
+                return Err(Error::TooManyExprs(trailing.position)),
             Some(Err(e)) =>
                 // The tokenizer had an issue, just pass it along
                 return Err(e),
@@ -189,7 +189,7 @@ fn name_resolution(expr_tree: &mut Expr) -> Result<(), Error> {
 fn resolve_identifier(starting_idn: Identifier) -> Result<Expr, Error> {
     match starting_idn.name.as_str() {
         "stdin" => Ok(Expr::Stdin),
-        _       => error::error(ErrCode::CantResolve(starting_idn)),
+        _       => Err(Error::CantResolve(starting_idn)),
     }
 }
 
@@ -198,10 +198,10 @@ fn resolve_fun_call(function: &mut Expr, arguments: &mut Vec<Expr>) -> Result<Ex
         Expr::UnresolvedIdentifier(idn) => {
             match idn.name.as_str() {
                 "filter" => filter_from_fun_call(std::mem::take(arguments), idn.position),
-                _ => error::error(ErrCode::NotAFunction(idn.position)),
+                _ => Err(Error::NotAFunction(idn.position)),
             }
         }
-        _ => error::error(ErrCode::NotAFunction(function.position())),
+        _ => Err(Error::NotAFunction(function.position())),
     }
 }
 
@@ -209,11 +209,11 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
     match args.len() {
         0 => {
             // Not enough arguments
-            error::error(ErrCode::NotEnoughArguments(fn_pos.right_after()))
+            Err(Error::NotEnoughArguments(fn_pos.right_after()))
         },
         1 => {
             // Not enough arguments
-            error::error(ErrCode::NotEnoughArguments(args[0].position().right_after()))
+            Err(Error::NotEnoughArguments(args[0].position().right_after()))
         },
         2 => {
             // Right number of arguments: build the Expr
@@ -225,7 +225,7 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
         },
         _ => {
             // Too many arguments
-            error::error(ErrCode::TooManyArguments(args[2].position()))
+            Err(Error::TooManyArguments(args[2].position()))
         }
     }
 }
