@@ -16,6 +16,7 @@ impl<T: Iterator<Item=Result<RtVal, Error>>> ExecStream for T { }
 pub(super) enum StreamNode {
     Stdin(StdinState),
     Filter(StreamFilter),
+    Map(StreamMap)
 }
 
 // TODO consider introducing a macro for this
@@ -26,6 +27,7 @@ impl Iterator for StreamNode {
         match self {
             Self::Stdin(s) => s.next(),
             Self::Filter(f) => f.next(),
+            Self::Map(f) => f.next(),
         }
     }
 }
@@ -36,6 +38,7 @@ pub fn stream_from(expr: Expr) -> StreamNode {
     match expr {
         Expr::Stdin => StdinState::new_node(),
         Expr::Filter { filter_fn, data_source } => StreamFilter::new_node(filter_fn, data_source),
+        Expr::Map { map_fn, data_source } => StreamMap::new_node(map_fn, data_source),
         // It's fine for us to panic here, as typechecking must have guaranteed that there
         // are no surprises when we arrive here
         _ => panic!("Not a stream: {:?}", expr),
@@ -136,6 +139,68 @@ impl Iterator for StreamFilter {
                     }
                 },
             }
+        }
+    }
+}
+
+/* StreamMap */
+
+struct StreamMap {
+    map_fn:       Box<ScalarNode>,
+    back_channel: StreamVar,
+    stream:       Box<StreamNode>,
+}
+
+impl StreamMap {
+    fn new_node(map_fn: Box<Expr>, data_source: Box<Expr>) -> StreamNode {
+        // Note: Box::into_inner is only available on nightly
+        fn unbox<T>(boxed: Box<T>) -> T {
+            *boxed
+        }
+
+        fn box_map<T, U, F: FnOnce(T) -> U>(a: Box<T>, f: F) -> Box<U> {
+            let b = f(unbox(a));
+            Box::new(b)
+        }
+
+        let (back_channel_for_me, back_channel_for_them) = StreamVar::new_pair();
+
+        // Compile the map function as a function call
+        let back_channel_read = Expr::ReadVar(back_channel_for_them);
+        let map_fun_call = Expr::FunCall { function: map_fn, arguments: vec![back_channel_read] };
+        let rt_map_fn = scalar::scalar_from(map_fun_call);
+
+        let map = StreamMap {
+            map_fn:    Box::new(rt_map_fn),
+            back_channel: back_channel_for_me,
+            stream:       box_map(data_source, stream_from),
+        };
+
+        StreamNode::Map(map)
+    }
+}
+
+impl Iterator for StreamMap {
+    type Item = RtRes;
+
+    fn next(&mut self) -> Option<Result<RtVal, Error>> {
+        match self.stream.next() {
+            // End of the stream
+            None => None,
+
+            // Stream encountered an error
+            // TODO make these two match arms into a macro
+            same@Some(Err(_)) => same,
+
+            // We actually got a value from the stream
+            Some(Ok(rt_val)) => {
+                self.back_channel.write(rt_val);
+
+                match self.map_fn.eval() {
+                    Ok(v) => Some(Ok(v)),
+                    Err(e) => Some(Err(e)),
+                }
+            },
         }
     }
 }

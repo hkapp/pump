@@ -32,7 +32,7 @@ assert_eq () {
     echo "$left"
     [ "$left" == "$right" ]
 }
-export -f invalid_program
+export -f assert_eq
 
 # TODO remove the second argument completely
 bash "$test_script" "$PUMP"

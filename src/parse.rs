@@ -1,6 +1,6 @@
 mod token;
 
-pub use token::{ParsePos, Identifier, Token};
+pub use token::{ParsePos, Identifier, Token, RegexSubst};
 
 use std::{fmt::Display, iter::Peekable, ops::DerefMut};
 
@@ -18,6 +18,7 @@ pub enum Expr {
     /* Streams */
     Stdin,
     Filter { filter_fn: Box<Expr>, data_source: Box<Expr> },
+    Map { map_fn: Box<Expr>, data_source: Box<Expr> },
     /* Scalars */
     RegexMatch(regex::Regex, ParsePos),
     RegexSubst(token::RegexSubst),
@@ -32,6 +33,8 @@ impl Expr {
         match self {
             Self::Filter { filter_fn, data_source } =>
                 vec![filter_fn, data_source],
+            Self::Map { map_fn, data_source } =>
+                vec![map_fn, data_source],
             Self::RegexMatch(..) => Vec::new(),
             Self::RegexSubst(..) => Vec::new(),
             Self::Stdin => Vec::new(),
@@ -206,7 +209,8 @@ fn resolve_fun_call(function: &mut Expr, arguments: &mut Vec<Expr>) -> Result<Ex
         Expr::UnresolvedIdentifier(idn) => {
             match idn.name.as_str() {
                 "filter" => filter_from_fun_call(std::mem::take(arguments), idn.position),
-                _ => Err(Error::NotAFunction(idn.position)),
+                "map"    => map_from_fun_call(std::mem::take(arguments), idn.position),
+                _        => Err(Error::NotAFunction(idn.position)),
             }
         }
         _ => Err(Error::NotAFunction(function.position())),
@@ -238,6 +242,31 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
     }
 }
 
+fn map_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, Error> {
+    match args.len() {
+        0 => {
+            // Not enough arguments
+            Err(Error::NotEnoughArguments(fn_pos.right_after()))
+        },
+        1 => {
+            // Not enough arguments
+            Err(Error::NotEnoughArguments(args[0].position().right_after()))
+        },
+        2 => {
+            // Right number of arguments: build the Expr
+            // Note: we get the arguments in reverse order because of pop()
+            let data_source = args.pop().unwrap();
+            let map_fn = args.pop().unwrap();
+
+            Ok(Expr::Map { map_fn: Box::new(map_fn), data_source: Box::new(data_source) })
+        },
+        _ => {
+            // Too many arguments
+            Err(Error::TooManyArguments(args[2].position()))
+        }
+    }
+}
+
 /* Pretty printing */
 
 impl Display for Expr {
@@ -246,6 +275,9 @@ impl Display for Expr {
             Expr::Stdin => write!(f, "stdin"),
             Expr::Filter { filter_fn, data_source } => {
                 write!(f, "filter {} {}", filter_fn, data_source)
+            },
+            Expr::Map { map_fn, data_source } => {
+                write!(f, "map {} {}", map_fn, data_source)
             },
             Expr::RegexMatch(re, _) => {
                 write!(f, "m/{}/", re.as_str())
