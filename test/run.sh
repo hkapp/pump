@@ -26,5 +26,13 @@ invalid_program () {
 }
 export -f invalid_program
 
+assert_eq () {
+    left="$1"
+    right="$2"
+    echo "$left"
+    [ "$left" == "$right" ]
+}
+export -f invalid_program
+
 # TODO remove the second argument completely
 bash "$test_script" "$PUMP"

@@ -20,6 +20,7 @@ pub enum Expr {
     Filter { filter_fn: Box<Expr>, data_source: Box<Expr> },
     /* Scalars */
     RegexMatch(regex::Regex, ParsePos),
+    RegexSubst(token::RegexSubst),
     UnresolvedIdentifier(Identifier),
     FunCall { function: Box<Expr>, arguments: Vec<Expr> },
     ReadVar(runtime::StreamVar),
@@ -32,6 +33,7 @@ impl Expr {
             Self::Filter { filter_fn, data_source } =>
                 vec![filter_fn, data_source],
             Self::RegexMatch(..) => Vec::new(),
+            Self::RegexSubst(..) => Vec::new(),
             Self::Stdin => Vec::new(),
             Self::UnresolvedIdentifier(_) => Vec::new(),
             Self::FunCall { function, arguments } => {
@@ -102,6 +104,7 @@ fn trivial_expr(token: Token) -> Expr {
     match token.kind {
         Kind::Identifier(idn) => Expr::UnresolvedIdentifier(idn),
         Kind::RegexMatch(rm) => Expr::RegexMatch(rm, pos),
+        Kind::RegexSubst(subst) => Expr::RegexSubst(subst),
     }
 }
 
@@ -246,6 +249,9 @@ impl Display for Expr {
             },
             Expr::RegexMatch(re, _) => {
                 write!(f, "m/{}/", re.as_str())
+            },
+            Expr::RegexSubst(subst) => {
+                write!(f, "s/{}/{}/", subst.search.as_str(), subst.replace)
             },
             Expr::UnresolvedIdentifier(identifier) => {
                 write!(f, "?:{}:?", identifier.name)
