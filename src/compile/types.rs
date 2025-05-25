@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::Error;
 
 use super::{Expr, Position};
@@ -44,14 +46,22 @@ impl Typecheck for Expr {
                 let source_items: &Type =
                     match &source_type {
                         Type::Stream(item_type) => item_type,
-                        _ => return Err(Error::WrongArgType(data_source.position())),
+                        _ => return Err(Error::WrongArgType {
+                            expected: "any stream type".into(),
+                            found:    source_type.to_string(),
+                            err_pos:  data_source.position()
+                        }),
                     };
 
                 // The filter function must go from the data source's item type to boolean
                 let fn_type = filter_fn.typecheck()?;
                 let expected_fn_type = Type::function(vec![source_items.clone()], Type::Bool);
                 if fn_type != expected_fn_type {
-                    return Err(Error::WrongArgType(filter_fn.position()));
+                    return Err(Error::WrongArgType {
+                        expected: expected_fn_type.to_string(),
+                        found:    fn_type.to_string(),
+                        err_pos:  filter_fn.position()
+                    });
                 }
 
                 Ok(source_type)
@@ -62,11 +72,16 @@ impl Typecheck for Expr {
                 let source_items: &Type =
                     match &source_type {
                         Type::Stream(item_type) => item_type,
-                        _ => return Err(Error::WrongArgType(data_source.position())),
+                        _ => return Err(Error::WrongArgType {
+                            expected: "any stream type".into(),
+                            found:    source_type.to_string(),
+                            err_pos:  data_source.position()
+                        }),
                     };
 
                 // The mapping function must take the data source's item type as argument
                 let fn_type = map_fn.typecheck()?;
+                let fn_type_str = fn_type.to_string();  // used to beat the borrow checker
                 // TODO should we remember this mapped-to type in the Map node?
                 let mapped_to =
                     match fn_type {
@@ -79,14 +94,28 @@ impl Typecheck for Expr {
                                     return_type
                                 }
                                 else {
-                                    return Err(Error::WrongArgType(map_fn.position()));
+                                    return Err(Error::WrongArgType {
+                                        expected: format!("fn ({}) -> anything", source_items.to_string()),
+                                        found:    single_param.to_string(),
+                                        err_pos:  map_fn.position()
+                                    });
                                 }
                             }
                             else {
-                                return Err(Error::WrongArgType(map_fn.position()));
+                                return Err(Error::WrongArgType {
+                                    expected: "a function of a single argument".into(),
+                                    found:    fn_type_str,
+                                    err_pos:  map_fn.position()
+                                });
                             }
                         }
-                        _ => { return Err(Error::WrongArgType(map_fn.position())); }
+                        _ => {
+                            return Err(Error::WrongArgType {
+                                expected: "any function type".into(),
+                                found:    fn_type_str,
+                                err_pos:  map_fn.position()
+                            });
+                        }
                     };
 
                 Ok(Type::Stream(mapped_to))
@@ -112,7 +141,11 @@ impl Typecheck for Expr {
                         {
                             let arg_type = arg.typecheck()?;
                             if arg_type != param_type {
-                                return Err(Error::WrongArgType(arg.position()));
+                                return Err(Error::WrongArgType {
+                                    expected: param_type.to_string(),
+                                    found:    arg_type.to_string(),
+                                    err_pos:  arg.position()
+                                });
                             }
                         }
 
@@ -124,6 +157,28 @@ impl Typecheck for Expr {
             },
 
             Expr::ReadVar(_stream_var) => todo!(),
+        }
+    }
+}
+
+/* Pretty printing */
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Bool => write!(f, "bool"),
+            Type::String => write!(f, "string"),
+            Type::Stream(item) => write!(f, "stream of {}", item),
+            Type::Function { parameters, return_type } => {
+                write!(f, "fn (")?;
+                for (idx, param) in parameters.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", param)?;
+                }
+                write!(f, ") -> {}", return_type)
+            }
         }
     }
 }
