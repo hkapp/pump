@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::Error;
 
-use super::{Expr, Position};
+use super::{Expr, Position, FunCall};
 
 pub fn typecheck(program: &mut Expr) -> Result<(), Error> {
     program.typecheck()?;
@@ -132,31 +132,36 @@ impl Typecheck for Expr {
                 // This is a logic/programming error
                 panic!("Unexpected unresolved identifier during typechecking: {:?}", identifier.name),
 
-            Expr::FunCall { function, arguments } => {
-                match function.typecheck()? {
-                    Type::Function { parameters, return_type } => {
-                        for (param_type, arg)
-                        in parameters.into_iter()
-                            .zip(arguments.iter_mut())
-                        {
-                            let arg_type = arg.typecheck()?;
-                            if arg_type != param_type {
-                                return Err(Error::WrongArgType {
-                                    expected: param_type.to_string(),
-                                    found:    arg_type.to_string(),
-                                    err_pos:  arg.position()
-                                });
-                            }
-                        }
-
-                        // Typecheck suceeded
-                        Ok(*return_type)
-                    }
-                    _ => Err(Error::NotAFunction(function.position())),
-                }
-            },
+            Expr::FunCall(fcall) =>
+                fcall.typecheck(),
 
             Expr::ReadVar(_stream_var) => todo!(),
+        }
+    }
+}
+
+impl Typecheck for FunCall {
+    fn typecheck(&mut self) -> Result<Type, Error> {
+        match self.function.typecheck()? {
+            Type::Function { parameters, return_type } => {
+                for (param_type, arg)
+                in parameters.into_iter()
+                    .zip(self.arguments.iter_mut())
+                {
+                    let arg_type = arg.typecheck()?;
+                    if arg_type != param_type {
+                        return Err(Error::WrongArgType {
+                            expected: param_type.to_string(),
+                            found:    arg_type.to_string(),
+                            err_pos:  arg.position()
+                        });
+                    }
+                }
+
+                // Typecheck suceeded
+                Ok(*return_type)
+            }
+            _ => Err(Error::NotAFunction(self.function.position())),
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::io::{self, StdinLock};
 
-use crate::{error::Error, compile::Expr};
+use crate::{compile::{Expr, FunCall}, error::Error};
 
 use super::{scalar::{self, ExecScalar, ScalarNode}, RtVal, StreamVar};
 
@@ -95,7 +95,7 @@ impl StreamFilter {
 
         // Compile the filter function as a function call
         let back_channel_read = Expr::ReadVar(back_channel_for_them);
-        let filter_fun_call = Expr::FunCall { function: filter_fn, arguments: vec![back_channel_read] };
+        let filter_fun_call = FunCall::new_expr_boxed(filter_fn, vec![back_channel_read]);
         let rt_filter_fn = scalar::scalar_from(filter_fun_call);
 
         let filter = StreamFilter {
@@ -168,7 +168,7 @@ impl StreamMap {
 
         // Compile the map function as a function call
         let back_channel_read = Expr::ReadVar(back_channel_for_them);
-        let map_fun_call = Expr::FunCall { function: map_fn, arguments: vec![back_channel_read] };
+        let map_fun_call = FunCall::new_expr_boxed(map_fn, vec![back_channel_read]);
         let rt_map_fn = scalar::scalar_from(map_fun_call);
 
         let map = StreamMap {
