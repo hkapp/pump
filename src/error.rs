@@ -11,7 +11,7 @@ pub enum Error {
     TooManyArguments(ParsePos),
     UnrecognizedToken(ParsePos),
     NotAFunction(ParsePos),
-    WrongArgType(ParsePos),
+    WrongArgType { expected: String, found: String, err_pos: ParsePos },
 }
 
 impl Error {
@@ -37,7 +37,7 @@ impl Error {
             Error::TooManyArguments(err_pos) => Some(*err_pos),
             Error::UnrecognizedToken(err_pos) => Some(*err_pos),
             Error::NotAFunction(err_pos) => Some(*err_pos),
-            Error::WrongArgType(err_pos) => Some(*err_pos),
+            Error::WrongArgType { err_pos, .. } => Some(*err_pos),
         }
     }
 }
@@ -66,8 +66,8 @@ impl Display for Error {
                 write!(f, "Unrecognized token"),
             Error::NotAFunction(_) =>
                 write!(f, "Not a function"),
-            Error::WrongArgType(_) =>
-                write!(f, "Wrong argument type in function call"),
+            Error::WrongArgType { expected, found, .. } =>
+                write!(f, "Wrong argument type in function call: expected {}, found {}", expected, found),
         }
     }
 }
