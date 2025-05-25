@@ -1,6 +1,6 @@
 use std::io::{self, StdinLock};
 
-use crate::{error::Error, parse::Expr};
+use crate::{error::Error, compile::Expr};
 
 use super::{scalar::{self, ExecScalar, ScalarNode}, RtVal, StreamVar};
 
