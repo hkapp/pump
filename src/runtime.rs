@@ -11,7 +11,7 @@ pub fn exec_and_print(expr_tree: Expr) -> Result<(), Error> {
 
     while let Some(rt_val) = exec_tree.next() {
         let line_to_print = rt_val?;
-        println!("{}", line_to_print.str_ref().unwrap());
+        println!("{}", line_to_print.format());
     }
     Ok(())
 }
@@ -36,6 +36,13 @@ impl RtVal {
         match self {
             Self::Bool(b) => Some(*b),
             _ => None,
+        }
+    }
+
+    fn format(&self) -> String {
+        match self {
+            Self::Bool(b) => b.to_string(),
+            Self::String(s) => s.clone(),
         }
     }
 }
