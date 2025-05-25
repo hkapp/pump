@@ -1,6 +1,6 @@
 use regex::Regex;
 
-use crate::{error::Error, parse::Expr};
+use crate::{error::Error, parse::{self, Expr}};
 
 use super::{RtVal, StreamVar};
 
@@ -11,6 +11,7 @@ pub trait ExecScalar {
 
 pub enum ScalarNode {
     RegexMatch(RegexMatch),
+    RegexSubst(RegexSubst),
     ReadStreamVar(ReadStreamVar),
 }
 
@@ -18,6 +19,7 @@ impl ExecScalar for ScalarNode {
     fn eval(&mut self) -> Result<RtVal, Error> {
         match self {
             Self::RegexMatch(r) => r.eval(),
+            Self::RegexSubst(subst) => subst.eval(),
             Self::ReadStreamVar(rsv) => rsv.eval(),
         }
     }
@@ -47,6 +49,11 @@ fn scalar_fun_call(function: Expr, mut arguments: Vec<Expr>) -> ScalarNode {
             let single_arg = arguments.pop().unwrap();
             RegexMatch::new_node(regex, single_arg)
         }
+        Expr::RegexSubst(subst) => {
+            assert_eq!(arguments.len(), 1);
+            let single_arg = arguments.pop().unwrap();
+            RegexSubst::new_node(subst, single_arg)
+        }
         _ => todo!(),
     }
 }
@@ -72,6 +79,57 @@ impl ExecScalar for RegexMatch {
         let input = self.argument.eval()?;
         let is_match = self.regex.is_match(&input.str_ref().unwrap());
         let rt_val = is_match.into();
+        Ok(rt_val)
+    }
+}
+
+/* RegexSubst */
+
+struct RegexSubst {
+    search:   Regex,
+    replace:  String,
+    argument: Box<ScalarNode>,
+}
+
+use std::cell::LazyCell;
+const REGEX_GROUP_ID: LazyCell<regex::Regex> =
+    LazyCell::new(|| regex::Regex::new(r"\\(\d)").unwrap());
+
+impl RegexSubst {
+    fn new_node(subst: parse::RegexSubst, arg: Expr) -> ScalarNode {
+        let rt_arg = scalar_from(arg);
+        let argument = Box::new(rt_arg);
+
+        let search = subst.search;
+
+        // The user-provided input contains sequences like "\1" to refer to named capture groups
+        // We replace these with "$1" to be able to use the native replace capabilities of
+        // the regex crate.
+        let replace =
+            REGEX_GROUP_ID.replace_all(&subst.replace, |rec: &regex::Captures| {
+                // Generate "${1}" to be 100% clear to the regex crate
+                format!("${{{}}}", rec.get(1).unwrap().as_str())
+            })
+            .into_owned();
+        // DEBUG
+        eprintln!("RegexSubst::new_node: {:?}", replace);
+
+        let me = RegexSubst { search, replace, argument };
+        ScalarNode::RegexSubst(me)
+    }
+}
+
+impl ExecScalar for RegexSubst {
+    fn eval(&mut self) -> Result<RtVal, Error> {
+        let input = self.argument.eval()?;
+        let str_input = input.str_ref().unwrap();
+
+        let replaced_str =
+            self.search
+                .replace(str_input, &self.replace)
+                .into_owned();
+
+        let rt_val = replaced_str.into();
         Ok(rt_val)
     }
 }
