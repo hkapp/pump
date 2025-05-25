@@ -27,6 +27,7 @@ pub struct Tokenizer<'a> {
 pub enum Kind {
     Identifier(Identifier),
     RegexMatch(Regex),
+    RegexSubst(RegexSubst),
 }
 
 impl Token {
@@ -46,6 +47,7 @@ impl Debug for Kind {
         match self {
             Kind::Identifier(idn) => write!(f, "Identifier({:?})", idn.name),
             Kind::RegexMatch(re) => write!(f, "RegexMatch({:?})", re.as_str()),
+            Kind::RegexSubst(subst) => write!(f, "RegexSubst({:?} -> {:?})", subst.search.as_str(), subst.replace),
         }
     }
 }
@@ -121,9 +123,10 @@ impl From<&TRDef> for TokenRx {
     }
 }
 
-const TOKEN_RXS: [TRDef; 2] = [
+const TOKEN_RXS: [TRDef; 3] = [
     // WARNING the ordering matters here
-    ("m/((?:[^/]|\\/)*)/",     regex_match),
+    ("m/((?:[^/]|\\/)*)/",   regex_match),
+    ("s/((?:[^/]|\\/)*)/((?:[^/]|\\/)*)/",   RegexSubst::token),
     ("[a-zA-Z][0-9a-zA-Z]*", Identifier::token),
 ];
 
@@ -137,6 +140,8 @@ fn regex_match(rec: &regex::Captures) -> Token {
     let pos = ParsePos::from_captures(rec);
     Token { position: pos, kind: Kind::RegexMatch(re_match) }
 }
+
+/* Identifier */
 
 #[derive(Debug)]
 pub struct Identifier {
@@ -166,6 +171,41 @@ impl Identifier {
         Self { name, position }
     }
 }
+
+/* RegexSubst */
+
+#[derive(Debug)]
+pub struct RegexSubst {
+    pub search:  Regex,
+    pub replace: String,
+}
+
+impl RegexSubst {
+    fn token(rec: &regex::Captures) -> Token {
+        let search_str =
+            rec.get(1)
+                .unwrap()
+                .as_str();
+
+        // FIXME need to return a proper error here
+        // What are the cases when this can fail though? Unmatched parentheses maybe?
+        let search_re = Regex::new(search_str).unwrap();
+
+        let replace_str =
+            rec.get(2)
+                .unwrap()
+                .as_str()
+                .into();
+
+        let pos = ParsePos::from_captures(rec);
+
+        let me = Self { search: search_re, replace: replace_str };
+        Token { position: pos, kind: Kind::RegexSubst(me) }
+    }
+}
+
+/* TokenRx */
+// TODO explain what this is
 
 impl TokenRx {
     fn try_at(&self, source: &str, start: usize) -> Option<Token> {
