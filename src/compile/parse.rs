@@ -15,6 +15,8 @@ pub fn parse(pgm: &str) -> Result<Expr, Error> {
     Ok(parsed)
 }
 
+/* Expr */
+
 #[derive(Debug)]
 pub enum Expr {
     /* Streams */
@@ -25,7 +27,7 @@ pub enum Expr {
     RegexMatch(regex::Regex, ParsePos),
     RegexSubst(token::RegexSubst),
     UnresolvedIdentifier(Identifier),
-    FunCall { function: Box<Expr>, arguments: Vec<Expr> },
+    FunCall(FunCall),
     ReadVar(runtime::StreamVar),
 }
 
@@ -41,9 +43,9 @@ impl Expr {
             Self::RegexSubst(..) => Vec::new(),
             Self::Stdin => Vec::new(),
             Self::UnresolvedIdentifier(_) => Vec::new(),
-            Self::FunCall { function, arguments } => {
-                let mut children = vec![function.deref_mut()];
-                children.extend(arguments.iter_mut());
+            Self::FunCall(fcall) => {
+                let mut children = vec![fcall.function.deref_mut()];
+                children.extend(fcall.arguments.iter_mut());
                 children
             },
             Self::ReadVar(_) => Vec::new(),
@@ -74,9 +76,9 @@ impl Expr {
 impl Position for Expr {
     fn position(&self) -> ParsePos {
         match self {
-            Expr::FunCall { function, .. } =>
+            Expr::FunCall(fcall) =>
                 // TODO introduce a parse pos merging
-                function.position(),
+                fcall.function.position(),
             Expr::UnresolvedIdentifier(idn) =>
                 idn.position,
             Expr::RegexMatch(_, pos) => *pos,
@@ -114,7 +116,7 @@ fn trivial_expr(token: Token) -> Expr {
     }
 }
 
-/* Expression tree */
+/* Parsing an expression tree */
 
 fn build_exp_tree<I: Iterator<Item=Result<Token, Error>>>(token_stream: I) -> Result<Expr, Error> {
     let mut tokens =
@@ -172,8 +174,27 @@ fn parse_fun_call<I: Iterator<Item=Result<Token, Error>>>(first_token: Expr, rem
         args.push(this_arg);
     }
 
-    let fun_call = Expr::FunCall { function: Box::new(first_token), arguments: args };
+    let fun_call = FunCall::new_expr(first_token, args);
     Ok(fun_call)
+}
+
+/* FunCall */
+
+#[derive(Debug)]
+pub struct FunCall {
+    pub function:  Box<Expr>,
+    pub arguments: Vec<Expr>,
+}
+
+impl FunCall {
+    fn new_expr(function: Expr, arguments: Vec<Expr>) -> Expr {
+        Self::new_expr_boxed(Box::new(function), arguments)
+    }
+
+    pub fn new_expr_boxed(function: Box<Expr>, arguments: Vec<Expr>) -> Expr {
+        let me = Self { function, arguments };
+        Expr::FunCall(me)
+    }
 }
 
 /* Name resolution */
@@ -186,8 +207,8 @@ fn name_resolution(expr_tree: &mut Expr) -> Result<(), Error> {
             *expr_tree = resolve_identifier(idn)?;
         }
         // Here we cheat a bit
-        Expr::FunCall { function, arguments } => {
-            *expr_tree = resolve_fun_call(function, arguments)?;
+        Expr::FunCall(fcall) => {
+            *expr_tree = resolve_fun_call(fcall)?;
         }
         _ => {},
     }
@@ -207,16 +228,16 @@ fn resolve_identifier(starting_idn: Identifier) -> Result<Expr, Error> {
     }
 }
 
-fn resolve_fun_call(function: &mut Expr, arguments: &mut Vec<Expr>) -> Result<Expr, Error> {
-    match function {
+fn resolve_fun_call(fcall: &mut FunCall) -> Result<Expr, Error> {
+    match fcall.function.as_mut() {
         Expr::UnresolvedIdentifier(idn) => {
             match idn.name.as_str() {
-                "filter" => filter_from_fun_call(std::mem::take(arguments), idn.position),
-                "map"    => map_from_fun_call(std::mem::take(arguments), idn.position),
+                "filter" => filter_from_fun_call(std::mem::take(&mut fcall.arguments), idn.position),
+                "map"    => map_from_fun_call(std::mem::take(&mut fcall.arguments), idn.position),
                 _        => Err(Error::NotAFunction(idn.position)),
             }
         }
-        _ => Err(Error::NotAFunction(function.position())),
+        _ => Err(Error::NotAFunction(fcall.function.position())),
     }
 }
 
@@ -291,9 +312,9 @@ impl Display for Expr {
             Expr::UnresolvedIdentifier(identifier) => {
                 write!(f, "?:{}:?", identifier.name)
             },
-            Expr::FunCall { function, arguments } => {
-                write!(f, "{}", function)?;
-                for arg in arguments {
+            Expr::FunCall(fcall) => {
+                write!(f, "{}", fcall.function)?;
+                for arg in &fcall.arguments {
                     write!(f, " {}", arg)?;
                 }
                 Ok(())

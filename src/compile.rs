@@ -3,7 +3,7 @@ mod types;
 
 use crate::Error;
 
-pub use parse::{ParsePos, Identifier, Expr, RegexSubst};
+pub use parse::{ParsePos, Identifier, Expr, RegexSubst, FunCall};
 
 pub fn compile(pgm: &str) -> Result<Expr, Error> {
     eprintln!("Program: {}", pgm);

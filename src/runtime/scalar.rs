@@ -31,8 +31,8 @@ impl ExecScalar for ScalarNode {
 // TODO convert into From impl
 pub fn scalar_from(expr: Expr) -> ScalarNode {
     match expr {
-        Expr::FunCall { function, arguments } =>
-            scalar_fun_call(*function, arguments),
+        Expr::FunCall(fcall) =>
+            scalar_fun_call(fcall),
 
         Expr::ReadVar(var) => ReadStreamVar::new_node(var),
 
@@ -44,16 +44,16 @@ pub fn scalar_from(expr: Expr) -> ScalarNode {
     }
 }
 
-fn scalar_fun_call(function: Expr, mut arguments: Vec<Expr>) -> ScalarNode {
-    match function {
+fn scalar_fun_call(mut fcall: compile::FunCall) -> ScalarNode {
+    match *fcall.function {
         Expr::RegexMatch(regex, _pos) => {
-            assert_eq!(arguments.len(), 1);
-            let single_arg = arguments.pop().unwrap();
+            assert_eq!(fcall.arguments.len(), 1);
+            let single_arg = fcall.arguments.pop().unwrap();
             RegexMatch::new_node(regex, single_arg)
         }
         Expr::RegexSubst(subst) => {
-            assert_eq!(arguments.len(), 1);
-            let single_arg = arguments.pop().unwrap();
+            assert_eq!(fcall.arguments.len(), 1);
+            let single_arg = fcall.arguments.pop().unwrap();
             RegexSubst::new_node(subst, single_arg)
         }
         _ => todo!(),
