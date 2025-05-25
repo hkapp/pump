@@ -1,6 +1,6 @@
 use std::{fmt::Display, io};
 
-use crate::parse::{ParsePos, Identifier};
+use crate::compile::{ParsePos, Identifier};
 
 pub enum Error {
     EmptyProgram,

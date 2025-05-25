@@ -3,7 +3,8 @@ mod stream;
 
 use std::{cell::Cell, fmt::{Debug, Display}, rc::Rc};
 
-use crate::{error::Error, parse::Expr};
+use crate::error::Error;
+use crate::compile::Expr;
 
 pub fn exec_and_print(expr_tree: Expr) -> Result<(), Error> {
     let mut exec_tree = stream::stream_from(expr_tree);

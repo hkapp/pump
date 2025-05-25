@@ -1,6 +1,7 @@
 use regex::Regex;
 
-use crate::{error::Error, parse::{self, Expr}};
+use crate::error::Error;
+use crate::compile::{self, Expr};
 
 use super::{RtVal, StreamVar};
 
@@ -97,7 +98,7 @@ const REGEX_GROUP_ID: LazyCell<regex::Regex> =
     LazyCell::new(|| regex::Regex::new(r"\\(\d)").unwrap());
 
 impl RegexSubst {
-    fn new_node(subst: parse::RegexSubst, arg: Expr) -> ScalarNode {
+    fn new_node(subst: compile::RegexSubst, arg: Expr) -> ScalarNode {
         let rt_arg = scalar_from(arg);
         let argument = Box::new(rt_arg);
 

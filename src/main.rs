@@ -1,5 +1,5 @@
 pub mod error;
-pub mod parse;
+pub mod compile;
 pub mod runtime;
 
 use std::env;
@@ -38,8 +38,6 @@ fn retrieve_program() -> Result<String, Error> {
 }
 
 fn submain(pgm: &str) -> Result<(), Error> {
-    eprintln!("Program: {}", pgm);
-    let expr_tree = parse::parse(&pgm)?;
-    eprintln!("Parsed program: {}", expr_tree.pretty_print());
-    runtime::exec_and_print(expr_tree)
+    let valid_pgm = compile::compile(&pgm)?;
+    runtime::exec_and_print(valid_pgm)
 }
