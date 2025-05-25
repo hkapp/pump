@@ -9,6 +9,7 @@ pub trait ExecScalar {
     fn eval(&mut self) -> Result<RtVal, Error>;
 }
 
+#[allow(private_interfaces)]
 pub enum ScalarNode {
     RegexMatch(RegexMatch),
     RegexSubst(RegexSubst),
@@ -44,7 +45,7 @@ pub fn scalar_from(expr: Expr) -> ScalarNode {
 
 fn scalar_fun_call(function: Expr, mut arguments: Vec<Expr>) -> ScalarNode {
     match function {
-        Expr::RegexMatch(regex, pos) => {
+        Expr::RegexMatch(regex, _pos) => {
             assert_eq!(arguments.len(), 1);
             let single_arg = arguments.pop().unwrap();
             RegexMatch::new_node(regex, single_arg)

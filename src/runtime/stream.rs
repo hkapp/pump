@@ -13,6 +13,7 @@ trait ExecStream: Iterator<Item=Result<RtVal, Error>> { }
 // Any type that has the iterator we want is considered an ExecStream
 impl<T: Iterator<Item=Result<RtVal, Error>>> ExecStream for T { }
 
+#[allow(private_interfaces)]
 pub(super) enum StreamNode {
     Stdin(StdinState),
     Filter(StreamFilter),
