@@ -6,6 +6,8 @@ use std::{fmt::Display, iter::Peekable, ops::DerefMut};
 
 use crate::{error::Error, runtime};
 
+use super::Position;
+
 pub fn parse(pgm: &str) -> Result<Expr, Error> {
     let tokens = token::tokenize(pgm);
     let mut parsed = build_exp_tree(tokens)?;
@@ -63,7 +65,13 @@ impl Expr {
         }
     }*/
 
-    // TODO turn into a trait
+    // This is a weird trick to get println statements to look decent
+    pub fn pretty_print(&self) -> &Self {
+        self
+    }
+}
+
+impl Position for Expr {
     fn position(&self) -> ParsePos {
         match self {
             Expr::FunCall { function, .. } =>
@@ -76,11 +84,6 @@ impl Expr {
                 // FIXME this is terrible
                 todo!(),
         }
-    }
-
-    // This is a weird trick to get println statements to look decent
-    pub fn pretty_print(&self) -> &Self {
-        self
     }
 }
 
