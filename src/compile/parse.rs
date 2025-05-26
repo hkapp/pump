@@ -19,16 +19,21 @@ pub fn parse(pgm: &str) -> Result<Expr, Error> {
 
 #[derive(Debug)]
 pub enum Expr {
-    /* Streams */
-    Stdin,
-    Filter { filter_fn: Box<Expr>, data_source: Box<Expr> },
-    Map { map_fn: Box<Expr>, data_source: Box<Expr> },
-    /* Scalars */
-    RegexMatch(regex::Regex, ParsePos),
-    RegexSubst(token::RegexSubst),
+    Builtin(Builtin, ParsePos),
     UnresolvedIdentifier(Identifier),
     FunCall(FunCall),
+    Filter { filter_fn: Box<Expr>, data_source: Box<Expr> },
+    Map { map_fn: Box<Expr>, data_source: Box<Expr> },
     ReadVar(runtime::StreamVar),
+}
+
+#[derive(Debug)]
+pub enum Builtin {
+    /* Streams */
+    Stdin,
+    /* Scalars */
+    RegexMatch(regex::Regex),
+    RegexSubst(token::RegexSubst),
 }
 
 impl Expr {
@@ -39,9 +44,10 @@ impl Expr {
                 vec![filter_fn, data_source],
             Self::Map { map_fn, data_source } =>
                 vec![map_fn, data_source],
-            Self::RegexMatch(..) => Vec::new(),
-            Self::RegexSubst(..) => Vec::new(),
-            Self::Stdin => Vec::new(),
+            Self::Builtin(..) =>
+                // The Builtin expression is just a marker
+                // As such, it can never have children
+                Vec::new(),
             Self::UnresolvedIdentifier(_) => Vec::new(),
             Self::FunCall(fcall) => {
                 let mut children = vec![fcall.function.deref_mut()];
@@ -81,7 +87,8 @@ impl Position for Expr {
                 fcall.function.position(),
             Expr::UnresolvedIdentifier(idn) =>
                 idn.position,
-            Expr::RegexMatch(_, pos) => *pos,
+            Expr::Builtin(_, pos) =>
+                *pos,
             _ =>
                 // FIXME this is terrible
                 todo!(),
@@ -110,9 +117,12 @@ fn trivial_expr(token: Token) -> Expr {
 
     use token::Kind;
     match token.kind {
-        Kind::Identifier(idn) => Expr::UnresolvedIdentifier(idn),
-        Kind::RegexMatch(rm) => Expr::RegexMatch(rm, pos),
-        Kind::RegexSubst(subst) => Expr::RegexSubst(subst),
+        Kind::Identifier(idn) =>
+            Expr::UnresolvedIdentifier(idn),
+        Kind::RegexMatch(rm) =>
+            Expr::Builtin(Builtin::RegexMatch(rm), pos),
+        Kind::RegexSubst(subst) =>
+            Expr::Builtin(Builtin::RegexSubst(subst), pos),
     }
 }
 
@@ -223,7 +233,7 @@ fn name_resolution(expr_tree: &mut Expr) -> Result<(), Error> {
 
 fn resolve_identifier(starting_idn: Identifier) -> Result<Expr, Error> {
     match starting_idn.name.as_str() {
-        "stdin" => Ok(Expr::Stdin),
+        "stdin" => Ok(Expr::Builtin(Builtin::Stdin, starting_idn.position)),
         _       => Err(Error::CantResolve(starting_idn)),
     }
 }
@@ -296,18 +306,13 @@ fn map_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, Erro
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::Stdin => write!(f, "stdin"),
+            Expr::Builtin(b, _pos) =>
+                write!(f, "{}", b),
             Expr::Filter { filter_fn, data_source } => {
                 write!(f, "filter {} {}", filter_fn, data_source)
             },
             Expr::Map { map_fn, data_source } => {
                 write!(f, "map {} {}", map_fn, data_source)
-            },
-            Expr::RegexMatch(re, _) => {
-                write!(f, "m/{}/", re.as_str())
-            },
-            Expr::RegexSubst(subst) => {
-                write!(f, "s/{}/{}/", subst.search.as_str(), subst.replace)
             },
             Expr::UnresolvedIdentifier(identifier) => {
                 write!(f, "?:{}:?", identifier.name)
@@ -322,6 +327,19 @@ impl Display for Expr {
             Expr::ReadVar(stream_var) => {
                 write!(f, "(read {:?})", stream_var)
             },
+        }
+    }
+}
+
+impl Display for Builtin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Builtin::Stdin =>
+                write!(f, "stdin"),
+            Builtin::RegexMatch(re) =>
+                write!(f, "m/{}/", re.as_str()),
+            Builtin::RegexSubst(subst) =>
+                write!(f, "s/{}/{}/", subst.search.as_str(), subst.replace),
         }
     }
 }

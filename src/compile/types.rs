@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::Error;
 
-use super::{Expr, Position, FunCall};
+use super::{parse, Expr, FunCall, Position};
 
 pub fn typecheck(program: &mut Expr) -> Result<(), Error> {
     program.typecheck()?;
@@ -38,8 +38,8 @@ trait Typecheck {
 impl Typecheck for Expr {
     fn typecheck(&mut self) -> Result<Type, Error> {
         match self {
-            Expr::Stdin =>
-                Ok(Type::stream(Type::String)),
+            Expr::Builtin(b, _pos) =>
+                b.typecheck(),
 
             Expr::Filter { filter_fn, data_source } => {
                 let source_type = data_source.typecheck()?;
@@ -121,12 +121,6 @@ impl Typecheck for Expr {
                 Ok(Type::Stream(mapped_to))
             },
 
-            Expr::RegexMatch(..) =>
-                Ok(Type::function(vec![Type::String], Type::Bool)),
-
-            Expr::RegexSubst(..) =>
-                Ok(Type::function(vec![Type::String], Type::String)),
-
             Expr::UnresolvedIdentifier(identifier) =>
                 // We should not reach here with some identifiers still being unresolved
                 // This is a logic/programming error
@@ -162,6 +156,19 @@ impl Typecheck for FunCall {
                 Ok(*return_type)
             }
             _ => Err(Error::NotAFunction(self.function.position())),
+        }
+    }
+}
+
+impl Typecheck for parse::Builtin {
+    fn typecheck(&mut self) -> Result<Type, Error> {
+        match self {
+            parse::Builtin::Stdin =>
+                Ok(Type::stream(Type::String)),
+            parse::Builtin::RegexMatch(..) =>
+                Ok(Type::function(vec![Type::String], Type::Bool)),
+            parse::Builtin::RegexSubst(..) =>
+                Ok(Type::function(vec![Type::String], Type::String)),
         }
     }
 }
