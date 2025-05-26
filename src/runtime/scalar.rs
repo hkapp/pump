@@ -1,7 +1,7 @@
 use regex::Regex;
 
 use crate::error::Error;
-use crate::compile::{self, Expr};
+use crate::compile::{self, Builtin, Expr};
 
 use super::{RtVal, StreamVar};
 
@@ -27,16 +27,12 @@ impl ExecScalar for ScalarNode {
     }
 }
 
-// TODO make this take a box
 // TODO convert into From impl
 pub fn scalar_from(expr: Expr) -> ScalarNode {
     match expr {
-        Expr::FunCall(fcall) =>
-            scalar_fun_call(fcall),
+        Expr::FunCall(fcall) => scalar_fun_call(fcall),
 
         Expr::ReadVar(var) => ReadStreamVar::new_node(var),
-
-        Expr::RegexMatch(..) => panic!("We don't expect a RegexMatch outside of a FunCall anymore"),
 
         // It's fine for us to panic here, as typechecking must have guaranteed that
         // we have what our caller expects here
@@ -46,15 +42,20 @@ pub fn scalar_from(expr: Expr) -> ScalarNode {
 
 fn scalar_fun_call(mut fcall: compile::FunCall) -> ScalarNode {
     match *fcall.function {
-        Expr::RegexMatch(regex, _pos) => {
-            assert_eq!(fcall.arguments.len(), 1);
-            let single_arg = fcall.arguments.pop().unwrap();
-            RegexMatch::new_node(regex, single_arg)
-        }
-        Expr::RegexSubst(subst) => {
-            assert_eq!(fcall.arguments.len(), 1);
-            let single_arg = fcall.arguments.pop().unwrap();
-            RegexSubst::new_node(subst, single_arg)
+        Expr::Builtin(b, _pos) => {
+            match b {
+                Builtin::RegexMatch(regex) => {
+                    assert_eq!(fcall.arguments.len(), 1);
+                    let single_arg = fcall.arguments.pop().unwrap();
+                    RegexMatch::new_node(regex, single_arg)
+                }
+                Builtin::RegexSubst(subst) => {
+                    assert_eq!(fcall.arguments.len(), 1);
+                    let single_arg = fcall.arguments.pop().unwrap();
+                    RegexSubst::new_node(subst, single_arg)
+                }
+                _ => todo!(),
+            }
         }
         _ => todo!(),
     }

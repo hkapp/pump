@@ -1,6 +1,6 @@
 use std::io::{self, StdinLock};
 
-use crate::{compile::{Expr, FunCall}, error::Error};
+use crate::{compile::{Builtin, Expr, FunCall}, error::Error};
 
 use super::{scalar::{self, ExecScalar, ScalarNode}, RtVal, StreamVar};
 
@@ -37,7 +37,12 @@ impl Iterator for StreamNode {
 // TODO turn into a From impl
 pub fn stream_from(expr: Expr) -> StreamNode {
     match expr {
-        Expr::Stdin => StdinState::new_node(),
+        Expr::Builtin(b, _pos) => {
+            match b {
+                Builtin::Stdin => StdinState::new_node(),
+                _ => panic!("Not a stream builtin: {:?}", b),
+            }
+        }
         Expr::Filter { filter_fn, data_source } => StreamFilter::new_node(filter_fn, data_source),
         Expr::Map { map_fn, data_source } => StreamMap::new_node(map_fn, data_source),
         // It's fine for us to panic here, as typechecking must have guaranteed that there
