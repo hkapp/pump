@@ -36,13 +36,23 @@ impl Iterator for StreamNode {
 // TODO make this take a box
 // TODO turn into a From impl
 pub fn stream_from(expr: Expr) -> StreamNode {
+    let expr_str = format!("{:?}", expr);
     match expr {
         Expr::Builtin(b, _pos) => {
             match b {
                 Builtin::Stdin => StdinState::new_node(),
-                Builtin::Filter { filter_fn, data_source } => StreamFilter::new_node(filter_fn, data_source),
-                Builtin::Map { map_fn, data_source } => StreamMap::new_node(map_fn, data_source),
                 _ => panic!("Not a stream builtin: {:?}", b),
+            }
+        }
+
+        Expr::FunCall(fcall) => {
+            match *fcall.function {
+                Expr::Builtin(Builtin::Filter, _pos) =>
+                    StreamFilter::new_node(fcall.arguments),
+                Expr::Builtin(Builtin::Map, _pos) =>
+                    StreamMap::new_node(fcall.arguments),
+                _ =>
+                    panic!("Not a stream function call: {}", expr_str),
             }
         }
 
@@ -86,28 +96,24 @@ struct StreamFilter {
 }
 
 impl StreamFilter {
-    fn new_node(filter_fn: Box<Expr>, data_source: Box<Expr>) -> StreamNode {
-        // Note: Box::into_inner is only available on nightly
-        fn unbox<T>(boxed: Box<T>) -> T {
-            *boxed
-        }
-
-        fn box_map<T, U, F: FnOnce(T) -> U>(a: Box<T>, f: F) -> Box<U> {
-            let b = f(unbox(a));
-            Box::new(b)
-        }
-
-        let (back_channel_for_me, back_channel_for_them) = StreamVar::new_pair();
+    fn new_node(arguments: Vec<Expr>) -> StreamNode {
+        let mut args_iter = arguments.into_iter();
+        let filter_fn = args_iter.next().unwrap();
+        let data_source = args_iter.next().unwrap();
 
         // Compile the filter function as a function call
+        let (back_channel_for_me, back_channel_for_them) = StreamVar::new_pair();
         let back_channel_read = Expr::ReadVar(back_channel_for_them);
-        let filter_fun_call = FunCall::new_expr_boxed(filter_fn, vec![back_channel_read]);
+        let filter_fun_call = FunCall::new_expr(filter_fn, vec![back_channel_read]);
         let rt_filter_fn = scalar::scalar_from(filter_fun_call);
+
+        // Convert the data source
+        let input_stream = stream_from(data_source);
 
         let filter = StreamFilter {
             filter_fn:    Box::new(rt_filter_fn),
             back_channel: back_channel_for_me,
-            stream:       box_map(data_source, stream_from),
+            stream:       Box::new(input_stream),
         };
 
         StreamNode::Filter(filter)
@@ -159,28 +165,24 @@ struct StreamMap {
 }
 
 impl StreamMap {
-    fn new_node(map_fn: Box<Expr>, data_source: Box<Expr>) -> StreamNode {
-        // Note: Box::into_inner is only available on nightly
-        fn unbox<T>(boxed: Box<T>) -> T {
-            *boxed
-        }
-
-        fn box_map<T, U, F: FnOnce(T) -> U>(a: Box<T>, f: F) -> Box<U> {
-            let b = f(unbox(a));
-            Box::new(b)
-        }
-
-        let (back_channel_for_me, back_channel_for_them) = StreamVar::new_pair();
+    fn new_node(arguments: Vec<Expr>) -> StreamNode {
+        let mut args_iter = arguments.into_iter();
+        let map_fn = args_iter.next().unwrap();
+        let data_source = args_iter.next().unwrap();
 
         // Compile the map function as a function call
+        let (back_channel_for_me, back_channel_for_them) = StreamVar::new_pair();
         let back_channel_read = Expr::ReadVar(back_channel_for_them);
-        let map_fun_call = FunCall::new_expr_boxed(map_fn, vec![back_channel_read]);
+        let map_fun_call = FunCall::new_expr(map_fn, vec![back_channel_read]);
         let rt_map_fn = scalar::scalar_from(map_fun_call);
 
+        // Convert the input stream
+        let stream = stream_from(data_source);
+
         let map = StreamMap {
-            map_fn:    Box::new(rt_map_fn),
+            map_fn:       Box::new(rt_map_fn),
             back_channel: back_channel_for_me,
-            stream:       box_map(data_source, stream_from),
+            stream:       Box::new(stream),
         };
 
         StreamNode::Map(map)

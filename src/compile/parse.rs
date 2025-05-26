@@ -30,8 +30,8 @@ pub enum Expr {
 pub enum Builtin {
     /* Streams */
     Stdin,
-    Filter { filter_fn: Box<Expr>, data_source: Box<Expr> },
-    Map { map_fn: Box<Expr>, data_source: Box<Expr> },
+    Filter,
+    Map,
     /* Scalars */
     RegexMatch(regex::Regex),
     RegexSubst(token::RegexSubst),
@@ -41,10 +41,6 @@ impl Expr {
     fn children_mut(&mut self) -> Vec<&mut Self> {
         // TODO find a better way to avoid allocations
         match self {
-            Self::Builtin(Builtin::Filter { filter_fn, data_source }, _pos) =>
-                vec![filter_fn, data_source],
-            Self::Builtin(Builtin::Map { map_fn, data_source }, _pos) =>
-                vec![map_fn, data_source],
             Self::Builtin(..) =>
                 // The Builtin expression is just a marker
                 // As such, it can never have children
@@ -198,11 +194,11 @@ pub struct FunCall {
 }
 
 impl FunCall {
-    fn new_expr(function: Expr, arguments: Vec<Expr>) -> Expr {
+    pub fn new_expr(function: Expr, arguments: Vec<Expr>) -> Expr {
         Self::new_expr_boxed(Box::new(function), arguments)
     }
 
-    pub fn new_expr_boxed(function: Box<Expr>, arguments: Vec<Expr>) -> Expr {
+    fn new_expr_boxed(function: Box<Expr>, arguments: Vec<Expr>) -> Expr {
         let me = Self { function, arguments };
         Expr::FunCall(me)
     }
@@ -213,13 +209,9 @@ impl FunCall {
 fn name_resolution(expr_tree: &mut Expr) -> Result<(), Error> {
     match expr_tree {
         Expr::UnresolvedIdentifier(idn) => {
-            let dummy = Identifier { name: String::new(), position: idn.position };
-            let idn = std::mem::replace(idn, dummy);
-            *expr_tree = resolve_identifier(idn)?;
-        }
-        // Here we cheat a bit
-        Expr::FunCall(fcall) => {
-            *expr_tree = resolve_fun_call(fcall)?;
+            let pos = idn.position;
+            let builtin = resolve_builtin(idn.take())?;
+            *expr_tree = Expr::Builtin(builtin, pos);
         }
         _ => {},
     }
@@ -232,73 +224,15 @@ fn name_resolution(expr_tree: &mut Expr) -> Result<(), Error> {
     Ok(())
 }
 
-fn resolve_identifier(starting_idn: Identifier) -> Result<Expr, Error> {
+fn resolve_builtin(starting_idn: Identifier) -> Result<Builtin, Error> {
+    // Note: Rust playground's MIR emit shows us that a constant string
+    // match is basically turned into cascading if-elses. For performance,
+    // we would want to use a constant hash map here.
     match starting_idn.name.as_str() {
-        "stdin" => Ok(Expr::Builtin(Builtin::Stdin, starting_idn.position)),
-        _       => Err(Error::CantResolve(starting_idn)),
-    }
-}
-
-fn resolve_fun_call(fcall: &mut FunCall) -> Result<Expr, Error> {
-    match fcall.function.as_mut() {
-        Expr::UnresolvedIdentifier(idn) => {
-            match idn.name.as_str() {
-                "filter" => filter_from_fun_call(std::mem::take(&mut fcall.arguments), idn.position),
-                "map"    => map_from_fun_call(std::mem::take(&mut fcall.arguments), idn.position),
-                _        => Err(Error::NotAFunction(idn.position)),
-            }
-        }
-        _ => Err(Error::NotAFunction(fcall.function.position())),
-    }
-}
-
-fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, Error> {
-    match args.len() {
-        0 => {
-            // Not enough arguments
-            Err(Error::NotEnoughArguments(fn_pos.right_after()))
-        },
-        1 => {
-            // Not enough arguments
-            Err(Error::NotEnoughArguments(args[0].position().right_after()))
-        },
-        2 => {
-            // Right number of arguments: build the Expr
-            // Note: we get the arguments in reverse order because of pop()
-            let data_source = args.pop().unwrap();
-            let filter_fn = args.pop().unwrap();
-
-            Ok(Expr::Builtin(Builtin::Filter { filter_fn: Box::new(filter_fn), data_source: Box::new(data_source) }, fn_pos))
-        },
-        _ => {
-            // Too many arguments
-            Err(Error::TooManyArguments(args[2].position()))
-        }
-    }
-}
-
-fn map_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, Error> {
-    match args.len() {
-        0 => {
-            // Not enough arguments
-            Err(Error::NotEnoughArguments(fn_pos.right_after()))
-        },
-        1 => {
-            // Not enough arguments
-            Err(Error::NotEnoughArguments(args[0].position().right_after()))
-        },
-        2 => {
-            // Right number of arguments: build the Expr
-            // Note: we get the arguments in reverse order because of pop()
-            let data_source = args.pop().unwrap();
-            let map_fn = args.pop().unwrap();
-
-            Ok(Expr::Builtin(Builtin::Map { map_fn: Box::new(map_fn), data_source: Box::new(data_source) }, fn_pos))
-        },
-        _ => {
-            // Too many arguments
-            Err(Error::TooManyArguments(args[2].position()))
-        }
+        "stdin"  => Ok(Builtin::Stdin),
+        "filter" => Ok(Builtin::Filter),
+        "map"    => Ok(Builtin::Map),
+        _        => Err(Error::CantResolve(starting_idn)),
     }
 }
 
@@ -335,10 +269,10 @@ impl Display for Builtin {
                 write!(f, "m/{}/", re.as_str()),
             Builtin::RegexSubst(subst) =>
                 write!(f, "s/{}/{}/", subst.search.as_str(), subst.replace),
-            Builtin::Filter { filter_fn, data_source } =>
-                write!(f, "filter {} {}", filter_fn, data_source),
-            Builtin::Map { map_fn, data_source } =>
-                write!(f, "map {} {}", map_fn, data_source),
+            Builtin::Filter =>
+                write!(f, "filter"),
+            Builtin::Map =>
+                write!(f, "map"),
         }
     }
 }
