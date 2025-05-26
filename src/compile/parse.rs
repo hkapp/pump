@@ -17,13 +17,12 @@ pub fn parse(pgm: &str) -> Result<Expr, Error> {
 
 /* Expr */
 
+// TODO move to its own module under compile
 #[derive(Debug)]
 pub enum Expr {
     Builtin(Builtin, ParsePos),
     UnresolvedIdentifier(Identifier),
     FunCall(FunCall),
-    Filter { filter_fn: Box<Expr>, data_source: Box<Expr> },
-    Map { map_fn: Box<Expr>, data_source: Box<Expr> },
     ReadVar(runtime::StreamVar),
 }
 
@@ -31,6 +30,8 @@ pub enum Expr {
 pub enum Builtin {
     /* Streams */
     Stdin,
+    Filter { filter_fn: Box<Expr>, data_source: Box<Expr> },
+    Map { map_fn: Box<Expr>, data_source: Box<Expr> },
     /* Scalars */
     RegexMatch(regex::Regex),
     RegexSubst(token::RegexSubst),
@@ -40,9 +41,9 @@ impl Expr {
     fn children_mut(&mut self) -> Vec<&mut Self> {
         // TODO find a better way to avoid allocations
         match self {
-            Self::Filter { filter_fn, data_source } =>
+            Self::Builtin(Builtin::Filter { filter_fn, data_source }, _pos) =>
                 vec![filter_fn, data_source],
-            Self::Map { map_fn, data_source } =>
+            Self::Builtin(Builtin::Map { map_fn, data_source }, _pos) =>
                 vec![map_fn, data_source],
             Self::Builtin(..) =>
                 // The Builtin expression is just a marker
@@ -267,7 +268,7 @@ fn filter_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, E
             let data_source = args.pop().unwrap();
             let filter_fn = args.pop().unwrap();
 
-            Ok(Expr::Filter { filter_fn: Box::new(filter_fn), data_source: Box::new(data_source) })
+            Ok(Expr::Builtin(Builtin::Filter { filter_fn: Box::new(filter_fn), data_source: Box::new(data_source) }, fn_pos))
         },
         _ => {
             // Too many arguments
@@ -292,7 +293,7 @@ fn map_from_fun_call(mut args: Vec<Expr>, fn_pos: ParsePos) -> Result<Expr, Erro
             let data_source = args.pop().unwrap();
             let map_fn = args.pop().unwrap();
 
-            Ok(Expr::Map { map_fn: Box::new(map_fn), data_source: Box::new(data_source) })
+            Ok(Expr::Builtin(Builtin::Map { map_fn: Box::new(map_fn), data_source: Box::new(data_source) }, fn_pos))
         },
         _ => {
             // Too many arguments
@@ -308,12 +309,6 @@ impl Display for Expr {
         match self {
             Expr::Builtin(b, _pos) =>
                 write!(f, "{}", b),
-            Expr::Filter { filter_fn, data_source } => {
-                write!(f, "filter {} {}", filter_fn, data_source)
-            },
-            Expr::Map { map_fn, data_source } => {
-                write!(f, "map {} {}", map_fn, data_source)
-            },
             Expr::UnresolvedIdentifier(identifier) => {
                 write!(f, "?:{}:?", identifier.name)
             },
@@ -340,6 +335,10 @@ impl Display for Builtin {
                 write!(f, "m/{}/", re.as_str()),
             Builtin::RegexSubst(subst) =>
                 write!(f, "s/{}/{}/", subst.search.as_str(), subst.replace),
+            Builtin::Filter { filter_fn, data_source } =>
+                write!(f, "filter {} {}", filter_fn, data_source),
+            Builtin::Map { map_fn, data_source } =>
+                write!(f, "map {} {}", map_fn, data_source),
         }
     }
 }

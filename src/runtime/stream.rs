@@ -40,11 +40,12 @@ pub fn stream_from(expr: Expr) -> StreamNode {
         Expr::Builtin(b, _pos) => {
             match b {
                 Builtin::Stdin => StdinState::new_node(),
+                Builtin::Filter { filter_fn, data_source } => StreamFilter::new_node(filter_fn, data_source),
+                Builtin::Map { map_fn, data_source } => StreamMap::new_node(map_fn, data_source),
                 _ => panic!("Not a stream builtin: {:?}", b),
             }
         }
-        Expr::Filter { filter_fn, data_source } => StreamFilter::new_node(filter_fn, data_source),
-        Expr::Map { map_fn, data_source } => StreamMap::new_node(map_fn, data_source),
+
         // It's fine for us to panic here, as typechecking must have guaranteed that there
         // are no surprises when we arrive here
         _ => panic!("Not a stream: {:?}", expr),
