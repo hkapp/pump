@@ -12,6 +12,7 @@ pub enum Error {
     UnrecognizedToken(ParsePos),
     NotAFunction(ParsePos),
     WrongArgType { expected: String, found: String, err_pos: ParsePos },
+    NonFormattable(String),
 }
 
 impl Error {
@@ -38,6 +39,7 @@ impl Error {
             Error::UnrecognizedToken(err_pos) => Some(*err_pos),
             Error::NotAFunction(err_pos) => Some(*err_pos),
             Error::WrongArgType { err_pos, .. } => Some(*err_pos),
+            Error::NonFormattable(_) => None,
         }
     }
 }
@@ -68,6 +70,8 @@ impl Display for Error {
                 write!(f, "Not a function"),
             Error::WrongArgType { expected, found, .. } =>
                 write!(f, "Wrong argument type in function call: expected {}, found {}", expected, found),
+            Error::NonFormattable(type_str) =>
+                write!(f, "Top-level program type cannot be formatted: {}", type_str),
         }
     }
 }
