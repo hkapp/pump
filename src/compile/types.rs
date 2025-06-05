@@ -4,9 +4,26 @@ use crate::Error;
 
 use super::{Builtin, Expr, FunCall, Position};
 
-pub fn typecheck(program: &mut Expr) -> Result<(), Error> {
-    program.typecheck()?;
-    Ok(())
+/// Type checks an expression tree as a full program
+/// The top-level type is guaranteed to be formattable
+pub fn typecheck_program(program: &mut Expr) -> Result<(), Error> {
+    let top_level_type = program.typecheck()?;
+
+    if !is_formattable(&top_level_type) {
+        Err(Error::NonFormattable(format!("{}", top_level_type)))
+    }
+    else {
+        Ok(())
+    }
+}
+
+fn is_formattable(typ: &Type) -> bool {
+    // For now, only streams of a base type are formattable
+    match typ.stream_item() {
+        Some(Type::Bool)   => true,
+        Some(Type::String) => true,
+        _                  => false,
+    }
 }
 
 /* Type */
@@ -26,6 +43,13 @@ impl Type {
 
     fn function(parameters: Vec<Type>, return_type: Type) -> Self {
         Self::Function { parameters, return_type: Box::new(return_type) }
+    }
+
+    fn stream_item(&self) -> Option<&Type> {
+        match self {
+            Type::Stream(item) => Some(item),
+            _ => None,
+        }
     }
 }
 
@@ -66,7 +90,6 @@ impl Typecheck for FunCall {
                 _ => self.function.typecheck()?,
             };
 
-        eprintln!("FunCall::typecheck: standard function call typechecking starts now");
         match fn_type {
             Type::Function { parameters, return_type } => {
                 let n_args = self.arguments.len();
