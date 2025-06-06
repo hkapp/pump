@@ -1,9 +1,10 @@
 use regex::Regex;
 
 use crate::error::Error;
-use crate::compile::{self, Builtin, Expr};
+use crate::compile::{self, Builtin, Expr, ParsePos};
+use crate::Position;
 
-use super::{RtVal, StreamVar};
+use super::{RtVal, StreamVar, Number};
 
 /// Runtime components that return scalar values
 pub trait ExecScalar {
@@ -15,6 +16,7 @@ pub enum ScalarNode {
     RegexMatch(RegexMatch),
     RegexSubst(RegexSubst),
     ReadStreamVar(ReadStreamVar),
+    ToNumber(ToNumber)
 }
 
 impl ExecScalar for ScalarNode {
@@ -23,6 +25,7 @@ impl ExecScalar for ScalarNode {
             Self::RegexMatch(r) => r.eval(),
             Self::RegexSubst(subst) => subst.eval(),
             Self::ReadStreamVar(rsv) => rsv.eval(),
+            Self::ToNumber(n) => n.eval(),
         }
     }
 }
@@ -42,7 +45,7 @@ pub fn scalar_from(expr: Expr) -> ScalarNode {
 
 fn scalar_fun_call(mut fcall: compile::FunCall) -> ScalarNode {
     match *fcall.function {
-        Expr::Builtin(b, _pos) => {
+        Expr::Builtin(b, pos) => {
             match b {
                 Builtin::RegexMatch(regex) => {
                     assert_eq!(fcall.arguments.len(), 1);
@@ -54,10 +57,15 @@ fn scalar_fun_call(mut fcall: compile::FunCall) -> ScalarNode {
                     let single_arg = fcall.arguments.pop().unwrap();
                     RegexSubst::new_node(subst, single_arg)
                 }
-                _ => todo!(),
+                Builtin::ToNumber => {
+                    assert_eq!(fcall.arguments.len(), 1);
+                    let single_arg = fcall.arguments.pop().unwrap();
+                    ToNumber::new_node(single_arg, pos)
+                }
+                _ => panic!("Not a scalar builtin: {:?}", b),
             }
         }
-        _ => todo!(),
+        _ => panic!("Not a scalar expression: {:?}", fcall),
     }
 }
 
@@ -133,6 +141,43 @@ impl ExecScalar for RegexSubst {
                 .into_owned();
 
         let rt_val = replaced_str.into();
+        Ok(rt_val)
+    }
+}
+
+/* ToNumber */
+
+struct ToNumber {
+    argument: Box<ScalarNode>,
+    src_pos:  ParsePos,
+}
+
+impl ToNumber {
+    fn new_node(arg: Expr, to_num_pos: ParsePos) -> ScalarNode {
+        let rt_arg = scalar_from(arg);
+        let argument = Box::new(rt_arg);
+
+        let me = ToNumber { argument, src_pos: to_num_pos };
+        ScalarNode::ToNumber(me)
+    }
+}
+
+impl ExecScalar for ToNumber {
+    fn eval(&mut self) -> Result<RtVal, Error> {
+        let input = self.argument.eval()?;
+        let str_input = input.str_ref().unwrap();
+
+        use std::str::FromStr;
+        let num_value =
+            Number::from_str(str_input)
+                .map_err(|parse_err|
+                    Error::NotANumber {
+                        str_value: str_input.into(),
+                        parse_err,
+                        err_pos: self.src_pos
+                    })?;
+
+        let rt_val = num_value.into();
         Ok(rt_val)
     }
 }

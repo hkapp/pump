@@ -6,6 +6,8 @@ use std::env;
 
 use error::Error;
 
+pub use compile::Position;
+
 fn main() {
     let pgm = retrieve_program();
     match pgm {
