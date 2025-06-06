@@ -13,6 +13,7 @@ pub enum Error {
     NotAFunction(ParsePos),
     WrongArgType { expected: String, found: String, err_pos: ParsePos },
     NonFormattable(String),
+    NotANumber { str_value: String, parse_err: std::num::ParseFloatError, err_pos: ParsePos },
 }
 
 impl Error {
@@ -40,6 +41,7 @@ impl Error {
             Error::NotAFunction(err_pos) => Some(*err_pos),
             Error::WrongArgType { err_pos, .. } => Some(*err_pos),
             Error::NonFormattable(_) => None,
+            Error::NotANumber { err_pos, .. } => Some(*err_pos),
         }
     }
 }
@@ -61,8 +63,10 @@ impl Display for Error {
             Error::CantResolve(idn) =>
                 write!(f, "Can't resolve identifier {:?}", idn.name),
             Error::NotEnoughArguments(_) =>
+                // TODO add expectation
                 write!(f, "Not enough arguments in function call"),
             Error::TooManyArguments(_) =>
+                // TODO add expectation
                 write!(f, "Too many arguments in function call"),
             Error::UnrecognizedToken(_) =>
                 write!(f, "Unrecognized token"),
@@ -72,6 +76,8 @@ impl Display for Error {
                 write!(f, "Wrong argument type in function call: expected {}, found {}", expected, found),
             Error::NonFormattable(type_str) =>
                 write!(f, "Top-level program type cannot be formatted: {}", type_str),
+            Error::NotANumber { str_value, parse_err, .. } =>
+                write!(f, "runtime value {:?} cannot be parsed as a number ({})", str_value, parse_err),
         }
     }
 }

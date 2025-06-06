@@ -35,6 +35,7 @@ pub enum Builtin {
     /* Scalars */
     RegexMatch(regex::Regex),
     RegexSubst(token::RegexSubst),
+    ToNumber,
 }
 
 impl Expr {
@@ -54,21 +55,6 @@ impl Expr {
             Self::ReadVar(_) => Vec::new(),
         }
     }
-
-    /*fn get_child_mut(&mut self, index: usize) -> Option<&mut Self> {
-        match self {
-            Self::Filter { filter_fn, data_source } => {
-                match index {
-                    0 => Some(filter_fn),
-                    1 => Some(data_source),
-                    _ => None,
-                }
-            },
-            Self::RegexMatch(..) => None,
-            Self::Stdin => None,
-            Self::UnresolvedIdentifier(_) => None,
-        }
-    }*/
 
     // This is a weird trick to get println statements to look decent
     pub fn pretty_print(&self) -> &Self {
@@ -232,6 +218,7 @@ fn resolve_builtin(starting_idn: Identifier) -> Result<Builtin, Error> {
         "stdin"  => Ok(Builtin::Stdin),
         "filter" => Ok(Builtin::Filter),
         "map"    => Ok(Builtin::Map),
+        "num"    => Ok(Builtin::ToNumber),
         _        => Err(Error::CantResolve(starting_idn)),
     }
 }
@@ -273,6 +260,8 @@ impl Display for Builtin {
                 write!(f, "filter"),
             Builtin::Map =>
                 write!(f, "map"),
+            Builtin::ToNumber =>
+                write!(f, "num"),
         }
     }
 }

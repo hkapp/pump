@@ -21,8 +21,11 @@ pub fn exec_and_print(expr_tree: Expr) -> Result<(), Error> {
 #[derive(Clone)]
 enum RtVal {
     String(String),
+    Number(Number),
     Bool(bool)
 }
+
+type Number = f64;
 
 impl RtVal {
     fn str_ref(&self) -> Option<&str> {
@@ -41,8 +44,9 @@ impl RtVal {
 
     fn format(&self) -> String {
         match self {
-            Self::Bool(b) => b.to_string(),
             Self::String(s) => s.clone(),
+            Self::Number(n) => n.to_string(),
+            Self::Bool(b) => b.to_string(),
         }
     }
 }
@@ -51,20 +55,27 @@ impl Display for RtVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::String(s) => Display::fmt(s, f),
+            Self::Number(n) => Display::fmt(n, f),
             Self::Bool(b) => Display::fmt(b, f),
         }
-    }
-}
-
-impl From<bool> for RtVal {
-    fn from(value: bool) -> Self {
-        Self::Bool(value)
     }
 }
 
 impl From<String> for RtVal {
     fn from(value: String) -> Self {
         Self::String(value)
+    }
+}
+
+impl From<Number> for RtVal {
+    fn from(value: Number) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl From<bool> for RtVal {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
     }
 }
 

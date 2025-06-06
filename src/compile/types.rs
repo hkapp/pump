@@ -20,8 +20,9 @@ pub fn typecheck_program(program: &mut Expr) -> Result<(), Error> {
 fn is_formattable(typ: &Type) -> bool {
     // For now, only streams of a base type are formattable
     match typ.stream_item() {
-        Some(Type::Bool)   => true,
         Some(Type::String) => true,
+        Some(Type::Number) => true,
+        Some(Type::Bool)   => true,
         _                  => false,
     }
 }
@@ -30,8 +31,9 @@ fn is_formattable(typ: &Type) -> bool {
 
 #[derive(Clone, PartialEq, Eq)]
 enum Type {
-    Bool,
     String,
+    Number,
+    Bool,
     Stream(Box<Type>),
     Function { parameters: Vec<Type>, return_type: Box<Type> },
 }
@@ -136,10 +138,13 @@ impl Typecheck for Builtin {
                 Ok(Type::function(vec![Type::String], Type::Bool)),
             Builtin::RegexSubst(..) =>
                 Ok(Type::function(vec![Type::String], Type::String)),
+            Builtin::ToNumber =>
+                // TODO we should be able to support number to number as well
+                Ok(Type::function(vec![Type::String], Type::Number)),
 
 
             Builtin::Filter | Builtin::Map =>
-                todo!("We don't support full type equations yet"),
+                todo!("full type equations"),
         }
     }
 }
@@ -261,8 +266,9 @@ fn typecheck_map(arguments: &mut [Expr]) -> Result<Type, Error> {
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Type::Bool => write!(f, "bool"),
             Type::String => write!(f, "string"),
+            Type::Number => write!(f, "number"),
+            Type::Bool   => write!(f, "bool"),
             Type::Stream(item) => write!(f, "stream of {}", item),
             Type::Function { parameters, return_type } => {
                 write!(f, "fn (")?;
