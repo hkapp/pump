@@ -7,8 +7,8 @@ pub enum Error {
     TooManyCliArgs,
     TooManyExprs(ParsePos),  // TODO remove
     CantResolve(Identifier),
-    NotEnoughArguments(ParsePos),
-    TooManyArguments(ParsePos),
+    NotEnoughArguments { expected: usize, found: usize, err_pos: ParsePos },
+    TooManyArguments { expected: usize, found: usize, err_pos: ParsePos },
     UnrecognizedToken(ParsePos),
     NotAFunction(ParsePos),
     WrongArgType { expected: String, found: String, err_pos: ParsePos },
@@ -35,8 +35,8 @@ impl Error {
             Error::TooManyCliArgs => None,
             Error::TooManyExprs(err_pos) => Some(*err_pos),
             Error::CantResolve(idn) => Some(idn.position),
-            Error::NotEnoughArguments(err_pos) => Some(*err_pos),
-            Error::TooManyArguments(err_pos) => Some(*err_pos),
+            Error::NotEnoughArguments { err_pos, .. } => Some(*err_pos),
+            Error::TooManyArguments { err_pos, .. } => Some(*err_pos),
             Error::UnrecognizedToken(err_pos) => Some(*err_pos),
             Error::NotAFunction(err_pos) => Some(*err_pos),
             Error::WrongArgType { err_pos, .. } => Some(*err_pos),
@@ -62,12 +62,10 @@ impl Display for Error {
                 write!(f, "Too many expressions (we only support 1 right now)"),
             Error::CantResolve(idn) =>
                 write!(f, "Can't resolve identifier {:?}", idn.name),
-            Error::NotEnoughArguments(_) =>
-                // TODO add expectation
-                write!(f, "Not enough arguments in function call"),
-            Error::TooManyArguments(_) =>
-                // TODO add expectation
-                write!(f, "Too many arguments in function call"),
+            Error::NotEnoughArguments { expected, found, .. } =>
+                write!(f, "Not enough arguments in function call: expected {}, found {}", expected, found),
+            Error::TooManyArguments { expected, found, .. } =>
+                write!(f, "Too many arguments in function call: expected {}, found {}", expected, found),
             Error::UnrecognizedToken(_) =>
                 write!(f, "Unrecognized token"),
             Error::NotAFunction(_) =>

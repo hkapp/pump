@@ -2,7 +2,6 @@ use regex::Regex;
 
 use crate::error::Error;
 use crate::compile::{self, Builtin, Expr, ParsePos};
-use crate::Position;
 
 use super::{RtVal, StreamVar, Number};
 

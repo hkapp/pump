@@ -100,10 +100,18 @@ impl Typecheck for FunCall {
                 // Start by checking the number of arguments provided to the function
                 assert_ne!(n_params, 0);
                 if n_args < n_params {
-                    return Err(Error::NotEnoughArguments(self.arguments.last().unwrap().position().right_after()));
+                    return Err(Error::NotEnoughArguments {
+                        expected: n_params,
+                        found:    n_args,
+                        err_pos:  self.arguments.last().unwrap().position().right_after()
+                    });
                 }
                 else if n_args > n_params {
-                    return Err(Error::TooManyArguments(self.arguments[n_params].position()));
+                    return Err(Error::TooManyArguments {
+                        expected: n_params,
+                        found:    n_args,
+                        err_pos:  self.arguments[n_params].position()
+                    });
                 }
 
                 // Check the types of the arguments
