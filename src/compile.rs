@@ -13,6 +13,6 @@ pub fn compile(pgm: &str) -> Result<Expr, Error> {
     Ok(expr_tree)
 }
 
-pub trait Position {
+trait Position {
     fn position(&self) -> ParsePos;
 }
